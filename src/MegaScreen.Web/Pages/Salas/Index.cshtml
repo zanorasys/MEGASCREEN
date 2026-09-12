@@ -1,0 +1,7 @@
+@page
+@model MegaScreen.Web.Pages.Salas.IndexModel
+@{ ViewData["Title"] = "Salas"; }
+<div class="page-head"><div><h2>Salas (destino de atendimento)</h2><p>Locais para onde a senha é encaminhada.</p></div><div class="spacer"></div><button class="btn pri-btn2">Nova sala</button></div>
+<div class="card"><table><thead><tr><th>ID</th><th>Nome</th><th>Apelido</th><th>Prédio / Andar</th><th>Ramal</th><th>Cor</th></tr></thead><tbody>
+@foreach (var s in Model.Itens) { <tr><td class="ord">#@s.Id.ToString("D2")</td><td class="nm">@s.Nome</td><td>@s.Apelido</td><td>@s.Predio · @s.Andar</td><td>@s.Ramal</td><td><span class="swatch" style="background:@s.Cor"></span></td></tr> }
+</tbody></table></div>

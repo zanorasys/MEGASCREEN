@@ -1,0 +1,45 @@
+@page
+@model MegaScreen.Web.Pages.Account.LoginModel
+@{ Layout = null; ViewData["Title"] = "Entrar"; }
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mega Screen — Entrar</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+<div class="auth">
+    <div class="brandside">
+        <div class="logo">
+            <div class="mark"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M9 20h6M8 16v4M16 16v4"/></svg></div>
+            <div><h1>Mega Screen</h1><small>Sistema de Senhas</small></div>
+        </div>
+        <div class="pitch">
+            <h2>Gestão e exibição de senhas em painel, totem e guichê.</h2>
+            <p>Backoffice multi-filial, painel em tempo real e telas públicas personalizáveis.</p>
+            <div class="feats"><span>Multi-filial</span><span>Tempo real</span><span>TV &amp; Totem</span><span>White Label</span></div>
+        </div>
+    </div>
+    <div class="formside">
+        <div class="fbox">
+            <h3>Entrar</h3>
+            <p class="lead">Acesse o painel administrativo do Mega Screen.</p>
+            <form method="post">
+                <div asp-validation-summary="ModelOnly" style="color:var(--red);font-size:13px;margin-bottom:10px"></div>
+                <div class="field"><label>E-mail</label><input asp-for="Input.Email" type="email" /></div>
+                <div class="field"><label>Senha</label><input asp-for="Input.Senha" type="password" /></div>
+                <div class="row-between">
+                    <label class="check"><input asp-for="Input.LembrarDeMim" type="checkbox" style="accent-color:var(--primary)" /> Manter conectado</label>
+                    <a class="link" asp-page="/Account/EsqueciSenha">Esqueci minha senha</a>
+                </div>
+                <button class="btn pri-btn block" type="submit">Entrar</button>
+            </form>
+            <p class="foothint">Mega Screen © 2025 · desenvolvido por PontoBRWeb</p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,11 @@
+@page
+@model MegaScreen.Web.Pages.Usuarios.IndexModel
+@{ ViewData["Title"] = "Usuários"; }
+<div class="page-head"><div><h2>Usuários</h2><p>Usuários do backoffice e seus perfis.</p></div><div class="spacer"></div><button class="btn pri-btn2">Novo usuário</button></div>
+<div class="card"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Local atual</th><th>Status</th></tr></thead><tbody>
+@foreach (var u in Model.Itens)
+{
+    var cls = u.Perfil == PerfilUsuario.Admin ? "alta" : (u.Perfil == PerfilUsuario.Atendente ? "idoso" : "normal");
+    <tr><td class="nm">@u.Nome</td><td>@u.Email</td><td><span class="pri @cls">@u.Perfil</span></td><td>@u.LocalAtual</td><td><span class="st @(u.Ativo ? "on" : "off")">@(u.Ativo ? "Ativo" : "Inativo")</span></td></tr>
+}
+</tbody></table></div>

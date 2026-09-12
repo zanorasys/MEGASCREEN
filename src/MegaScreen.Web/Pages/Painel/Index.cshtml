@@ -1,0 +1,48 @@
+@page
+@model MegaScreen.Web.Pages.Painel.IndexModel
+@{ ViewData["Title"] = "Painel"; }
+
+<div class="grid">
+    <div class="stack">
+        <div class="card">
+            <div class="calling" id="calling"></div>
+            <div class="qtool">
+                <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/></svg><input id="search" placeholder="Buscar por senha, nome ou modalidade" /></div>
+                <button class="btn line sm" id="callNext">Chamar próxima</button>
+                <button class="btn pri-btn2 sm" id="addBtn">Adicionar manualmente</button>
+            </div>
+            <table><thead><tr><th>Ordem</th><th>Senha</th><th>Nome</th><th>Modalidade</th><th>Prioridade</th><th>Status</th><th></th></tr></thead><tbody id="queueBody"></tbody></table>
+        </div>
+    </div>
+    <div class="stack">
+        <div class="card"><div class="card-head"><h2>Próximas chamadas</h2><span class="rt"><span class="dot"></span>Ao vivo</span></div><div class="next-list" id="nextList"></div></div>
+    </div>
+</div>
+
+<div class="overlay" id="overlay"><div class="modal">
+    <div class="mhead"><h3>Adicionar senha manualmente</h3><button class="x" id="modalX">✕</button></div>
+    <div class="mbody">
+        <div class="field"><label>Nome do paciente</label><input id="asNome" placeholder="Nome completo"></div>
+        <div class="field"><label>Modalidade</label><select id="asMod">@foreach (var m in Model.Modalidades) { <option value="@m.Id">@m.Nome</option> }</select></div>
+        <div class="field"><label>Prioridade</label><div class="seg" id="asPri"><button class="on" data-p="1" type="button">Normal</button><button data-p="2" type="button">Idoso</button><button data-p="3" type="button">Prioridade</button></div></div>
+    </div>
+    <div class="mfoot"><button class="btn line" id="modalCancel">Cancelar</button><button class="btn pri-btn2" id="modalSave">Adicionar à fila</button></div>
+</div></div>
+
+<div class="overlay" id="printOverlay"><div class="modal" style="max-width:360px">
+    <div class="mhead"><h3>Senha gerada</h3><button class="x" id="printX">✕</button></div>
+    <div class="mbody"><div class="cupom-wrap" id="cupomPreview"></div></div>
+    <div class="mfoot"><button class="btn line" id="printClose">Fechar</button><button class="btn pri-btn2" id="printNow">Imprimir senha</button></div>
+</div></div>
+<div id="cupomPrint"></div>
+
+@section Scripts {
+    <script>
+        window.MEGA = {
+            filialId: @Model.FilialId,
+            localAtual: '@Model.LocalAtual',
+            fila: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Fila))
+        };
+    </script>
+    <script src="~/js/painel.js" asp-append-version="true"></script>
+}

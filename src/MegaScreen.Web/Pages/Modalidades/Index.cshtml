@@ -1,0 +1,11 @@
+@page
+@model MegaScreen.Web.Pages.Modalidades.IndexModel
+@{ ViewData["Title"] = "Modalidades"; }
+<div class="page-head"><div><h2>Modalidades de Atendimento</h2><p>Tipos de serviço e sua prioridade interna.</p></div><div class="spacer"></div><button class="btn pri-btn2">Nova modalidade</button></div>
+<div class="card"><table><thead><tr><th>Modalidade</th><th>Prefixo</th><th>Prioridade interna</th><th>Status</th></tr></thead><tbody>
+@foreach (var m in Model.Itens)
+{
+    var cls = m.PrioridadeInterna == Prioridade.Alta ? "alta" : (m.PrioridadeInterna == Prioridade.Idoso ? "idoso" : "normal");
+    <tr><td class="nm">@m.Nome</td><td><span class="senha-chip">@m.Prefixo</span></td><td><span class="pri @cls">@m.PrioridadeInterna</span></td><td><span class="st @(m.Ativa ? "on" : "off")">@(m.Ativa ? "Ativa" : "Inativa")</span></td></tr>
+}
+</tbody></table></div>

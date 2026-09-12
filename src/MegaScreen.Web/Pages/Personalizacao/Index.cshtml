@@ -1,0 +1,17 @@
+@page
+@model MegaScreen.Web.Pages.Personalizacao.IndexModel
+@{ ViewData["Title"] = "Personalização"; }
+<div class="page-head"><div><h2>Personalização (Aparência)</h2><p>Cores, fontes, imagem de fundo, logotipo e vídeo das telas públicas.</p></div><div class="spacer"></div><button class="btn pri-btn2">Salvar</button></div>
+<div class="cfg-grid">
+    <div class="card"><div class="card-head"><h2>Cores</h2></div><div style="padding:6px 16px 14px">
+        <div class="colorline"><span class="cn">Cor de fundo</span><input type="color" value="#0b0d24"></div>
+        <div class="colorline"><span class="cn">Cor do texto</span><input type="color" value="#ffffff"></div>
+        <div class="colorline"><span class="cn">Cor de destaque</span><input type="color" value="#4c5bf5"></div>
+    </div></div>
+    <div class="card"><div class="card-head"><h2>Exibição</h2></div><div style="padding:4px 16px 12px">
+        <div class="toggle-row"><div class="tx">Mostrar horário</div><div class="sw"><input type="checkbox" id="t1" checked><label for="t1"></label></div></div>
+        <div class="toggle-row"><div class="tx">Número da chamada</div><div class="sw"><input type="checkbox" id="t2" checked><label for="t2"></label></div></div>
+        <div class="toggle-row"><div class="tx">Ordem de chamada</div><div class="sw"><input type="checkbox" id="t3" checked><label for="t3"></label></div></div>
+        <div class="toggle-row"><div class="tx">Sala / guichê</div><div class="sw"><input type="checkbox" id="t4" checked><label for="t4"></label></div></div>
+    </div></div>
+</div>

@@ -1,0 +1,69 @@
+@{
+    var perfil = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Atendente";
+    var nome = User.Identity?.Name ?? "Usuário";
+    var iniciais = string.Concat(nome.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => p[0])).ToUpper();
+    string Active(string page) => (ViewContext.RouteData.Values["page"]?.ToString() ?? "").StartsWith(page, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    var filialId = ViewData["FilialId"] ?? 1;
+}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mega Screen — @ViewData["Title"]</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+<div class="app">
+    <aside class="side" id="side">
+        <div class="brand">
+            <div class="mark"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M9 20h6M8 16v4M16 16v4"/></svg></div>
+            <div><h1>Mega Screen</h1><small>Backoffice</small></div>
+        </div>
+        <nav class="nav">
+            <div class="nav-label">Operação</div>
+            <a class="@Active("/Painel")" asp-page="/Painel/Index">Painel</a>
+            <a class="@Active("/Telas")" asp-page="/Telas/Index">Telas</a>
+            <div class="nav-label">Configuração</div>
+            <a class="@Active("/SalasEspera")" asp-page="/SalasEspera/Index">Salas de Espera</a>
+            <a class="@Active("/Salas")" asp-page="/Salas/Index">Salas</a>
+            <a class="@Active("/Modalidades")" asp-page="/Modalidades/Index">Modalidades</a>
+            <a class="@Active("/Usuarios")" asp-page="/Usuarios/Index">Usuários</a>
+            <div class="nav-label">Sistema</div>
+            <a class="@Active("/Personalizacao")" asp-page="/Personalizacao/Index">Personalização</a>
+            <a class="@Active("/Ajuda")" asp-page="/Ajuda/Index">Ajuda</a>
+            @if (perfil == "Admin")
+            {
+                <div class="nav-label">ADMIN · White Label</div>
+                <a class="@Active("/Clientes")" asp-page="/Clientes/Index">Gestão de Clientes</a>
+                <a class="@Active("/Filiais")" asp-page="/Filiais/Index">Filiais</a>
+            }
+        </nav>
+        <div class="foot">
+            <div class="av">@iniciais</div>
+            <div><b>@nome</b><small>@perfil</small></div>
+            <form asp-page="/Account/Logout" method="post" style="margin-left:auto">
+                <button class="out" title="Sair" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
+            </form>
+        </div>
+    </aside>
+    <div class="main">
+        <div class="topbar">
+            <div class="burger" onclick="document.getElementById('side').classList.toggle('open')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></div>
+            <div class="pagetitle">@ViewData["Title"]</div>
+            <div class="spacer"></div>
+            <a class="btn line sm" asp-page="/Public/Tv" asp-route-filialId="@filialId" target="_blank">Ver painel (TV)</a>
+            <a class="btn line sm" asp-page="/Public/Totem" asp-route-filialId="@filialId" target="_blank">Totem</a>
+        </div>
+        <div class="content">
+            @RenderBody()
+        </div>
+    </div>
+</div>
+<div class="toasts" id="toasts"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

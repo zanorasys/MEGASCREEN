@@ -1,0 +1,43 @@
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+
+namespace MegaScreen.Web.Models;
+
+public class LoginViewModel
+{
+    [Required, EmailAddress] public string Email { get; set; } = "";
+    [Required] public string Senha { get; set; } = "";
+    public bool LembrarDeMim { get; set; }
+}
+
+public class NovaSenhaViewModel
+{
+    [JsonPropertyName("nome")] public string? Nome { get; set; }
+    [JsonPropertyName("modalidadeId")] public int ModalidadeId { get; set; }
+    [JsonPropertyName("prioridade")] public Prioridade Prioridade { get; set; } = Prioridade.Normal;
+}
+
+// Objeto enviado ao painel/TV via SignalR e embutido nas views.
+// Nomes fixados em minúsculas para consistência entre MVC, SignalR e o embed Razor.
+public class SenhaDto
+{
+    [JsonPropertyName("id")] public int Id { get; set; }
+    [JsonPropertyName("codigo")] public string Codigo { get; set; } = "";
+    [JsonPropertyName("nome")] public string? Nome { get; set; }
+    [JsonPropertyName("modalidade")] public string Modalidade { get; set; } = "";
+    [JsonPropertyName("prioridade")] public string Prioridade { get; set; } = "Normal";
+    [JsonPropertyName("status")] public string Status { get; set; } = "Aguardando";
+    [JsonPropertyName("ponto")] public string? Ponto { get; set; }
+    [JsonPropertyName("sala")] public string? Sala { get; set; }
+
+    public static SenhaDto From(Senha s) => new()
+    {
+        Id = s.Id,
+        Codigo = s.Codigo,
+        Nome = s.Nome,
+        Modalidade = s.Modalidade?.Nome ?? "",
+        Prioridade = s.Prioridade.ToString(),
+        Status = s.Status.ToString(),
+        Ponto = s.PontoAtendimento
+    };
+}

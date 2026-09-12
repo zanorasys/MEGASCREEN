@@ -1,0 +1,18 @@
+@page
+@{ Layout = null; ViewData["Title"] = "Recuperar acesso"; }
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="~/css/site.css" /></head>
+<body>
+<div class="auth">
+    <div class="brandside"><div class="logo"><div class="mark"></div><div><h1>Mega Screen</h1><small>Sistema de Senhas</small></div></div></div>
+    <div class="formside"><div class="fbox">
+        <h3>Recuperar acesso</h3>
+        <p class="lead">Informe seu e-mail e enviaremos um link para redefinir a senha.</p>
+        <div class="field"><label>E-mail cadastrado</label><input type="email" /></div>
+        <button class="btn pri-btn block">Enviar link</button>
+        <a class="btn ghost block" asp-page="/Account/Login" style="margin-top:10px">Voltar ao login</a>
+    </div></div>
+</div>
+</body></html>

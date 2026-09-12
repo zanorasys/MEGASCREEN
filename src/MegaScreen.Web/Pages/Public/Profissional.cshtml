@@ -1,0 +1,47 @@
+@page
+@model MegaScreen.Web.Pages.Public.ProfissionalModel
+@{ Layout = "_LayoutPublic"; ViewData["Title"] = "Profissional"; }
+<div class="prof active">
+    <div class="prof-top">
+        <div class="mk"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 3v6M9 6h6"/><rect x="4" y="9" width="16" height="11" rx="2"/></svg></div>
+        <div><h1>Painel do Profissional<small>@User.Identity?.Name</small></h1></div>
+        <div class="spacer" style="margin-left:auto"></div>
+        <a class="btn line sm" asp-page="/Painel/Index">Voltar ao backoffice</a>
+    </div>
+    <div class="prof-wrap">
+        <div class="prof-current" id="profCurrent">
+            <div class="lbl">Atendendo agora</div><div class="big" id="profSenha">—</div><div class="who" id="profNome">Nenhum paciente</div><div class="tags" id="profTags"></div>
+            <div class="prof-actions">
+                <button class="bigbtn call" id="profCall">Chamar próximo</button>
+                <button class="bigbtn done" id="profDone">Concluir</button>
+                <button class="bigbtn miss" id="profMiss">Não compareceu</button>
+            </div>
+        </div>
+        <div class="prof-side">
+            <div class="prof-room"><label>Sala de atendimento</label><select id="profRoom">@foreach (var s in Model.Salas) { <option>@s.Nome — @s.Predio · @s.Andar · R.@s.Ramal</option> }</select></div>
+            <div class="card"><div class="card-head"><h2>Fila</h2><span class="rt"><span class="dot"></span>Ao vivo</span></div><div class="next-list" id="profNext"></div></div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+<script>
+    const filialId=@Model.FilialId;
+    let fila=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Fila));
+    const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    function render(){
+        const a=fila.find(q=>q.status==='EmAtendimento');
+        profSenha.textContent=a?a.codigo:'—'; profNome.textContent=a?(a.nome||'—'):'Nenhum paciente';
+        profTags.innerHTML=a?`<span>${esc(a.modalidade)}</span>${a.prioridade!=='Normal'?`<span class="pri">${a.prioridade}</span>`:''}`:'';
+        const nxt=fila.filter(q=>q.status==='Aguardando').slice(0,4);
+        profNext.innerHTML=nxt.length?nxt.map((q,i)=>`<div class="next-item"><div class="o">${String(i+1).padStart(2,'0')}</div><span class="s">${q.codigo}</span><div class="nm2">${esc(q.nome||'—')}<small>${esc(q.modalidade)}</small></div></div>`).join(''):'<div class="next-empty">Fila vazia.</div>';
+    }
+    async function chamarProximo(){const n=fila.find(q=>q.status==='Aguardando');if(!n)return;await fetch(`/api/senhas/chamar/${n.id}?ponto=${encodeURIComponent(profRoom.value)}`,{method:'POST'});}
+    async function concluir(){const a=fila.find(q=>q.status==='EmAtendimento');if(!a)return;await fetch(`/api/senhas/concluir/${a.id}`,{method:'POST'});}
+    async function naoCompareceu(){const a=fila.find(q=>q.status==='EmAtendimento');if(!a)return;await fetch(`/api/senhas/status/${a.id}/4`,{method:'POST'});}
+    profCall.onclick=chamarProximo; profDone.onclick=concluir; profMiss.onclick=naoCompareceu;
+    const conn=new signalR.HubConnectionBuilder().withUrl('/hubs/senha').withAutomaticReconnect().build();
+    conn.on('FilaAtualizada',f=>{fila=f;render();});
+    conn.start().then(()=>conn.invoke('EntrarNaFilial',filialId)).catch(console.error);
+    render();
+</script>
+}

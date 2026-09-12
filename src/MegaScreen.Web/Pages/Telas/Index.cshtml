@@ -1,0 +1,17 @@
+@page
+@model MegaScreen.Web.Pages.Telas.IndexModel
+@{ ViewData["Title"] = "Telas"; }
+<div class="page-head"><div><h2>Gerenciamento de Telas</h2><p>Telas de exibição associadas às salas de espera.</p></div><div class="spacer"></div><button class="btn pri-btn2">Nova tela</button></div>
+<div class="card"><table>
+<thead><tr><th>ID</th><th>Nome</th><th>Apelido</th><th>Tipo</th><th>Localização</th><th>Cor</th><th>Visível</th></tr></thead>
+<tbody>
+@foreach (var t in Model.Itens)
+{
+    <tr>
+        <td class="ord">#@t.Id.ToString("D2")</td><td class="nm">@t.Nome</td><td>@t.Apelido</td>
+        <td><span class="badge-type @(t.Tipo == TipoTela.TvHorizontal ? "tv" : "tablet")">@(t.Tipo == TipoTela.TvHorizontal ? "TV Horizontal" : "Tablet Vertical")</span></td>
+        <td>@t.Predio · @t.Andar · R.@t.Ramal</td><td><span class="swatch" style="background:@t.Cor"></span></td>
+        <td><span class="st @(t.Visivel ? "on" : "off")">@(t.Visivel ? "Visível" : "Oculta")</span></td>
+    </tr>
+}
+</tbody></table></div>
