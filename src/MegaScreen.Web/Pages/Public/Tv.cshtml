@@ -1,14 +1,143 @@
 @page
 @model MegaScreen.Web.Pages.Public.TvModel
-@{Layout="_LayoutPublic";ViewData["Title"]="Painel TV";var p=Model.Personalizacao;}
-<style>:root{--tvbg:@p.CorFundo;--tvtext:@p.CorTexto;--tvaccent:@p.CorDestaque}.public{background:var(--tvbg);color:var(--tvtext);font-family:"@p.Fonte",sans-serif}.tv-top{background:linear-gradient(90deg,var(--tvaccent),#7C5CFC)}.tv-current .senha{-webkit-text-fill-color:var(--tvtext)}@if(!string.IsNullOrWhiteSpace(p.FundoUrl)){<text>.public{background-image:linear-gradient(rgba(11,13,36,.55),rgba(11,13,36,.55)),url('@p.FundoUrl');background-size:cover;background-position:center}</text>}</style>
-<div class="public active"><div class="tv-top"><div class="mk">@if(!string.IsNullOrWhiteSpace(p.LogoUrl)){<img src="@p.LogoUrl" alt="Logo" style="max-width:100%;max-height:100%">}</div><div><h1>@p.Marca</h1><small>@(Model.Filial?.Nome??"Filial")</small></div>@if(p.MostrarHorario){<div class="tvclock"><div class="t" id="tvClock">--:--</div><div class="d" id="tvToday"></div></div>}</div>
-<div class="tv-body"><div class="tv-current" id="tvCurrent"><div class="lbl">Senha</div>@if(p.MostrarNumero){<div class="senha" id="tvSenha">—</div>}else{<div id="tvSenha" style="display:none"></div>}<div class="nm" id="tvNome">Aguardando</div>@if(p.MostrarSala){<div class="sala" id="tvSala"></div>}else{<div id="tvSala" style="display:none"></div>}</div>
-<div class="tv-side" style="@(p.MostrarOrdem?"":"display:none")"><div class="sh">Últimas chamadas</div><div class="list" id="tvList"></div><div class="tv-media">@if(!string.IsNullOrWhiteSpace(p.VideoUrl)){<video src="@p.VideoUrl" autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover"></video>}else{<span>Área de vídeo / publicidade</span>}</div></div></div></div>
-@section Scripts{<script>
-const filialId=@Model.FilialId;let ultimas=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Ultimas));const TZ='America/Sao_Paulo';const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-// Destaque = última senha chamada; lateral = chamadas anteriores (mais recente primeiro).
-function render(){const a=ultimas[0];document.getElementById('tvSenha').textContent=a?a.codigo:'—';document.getElementById('tvNome').textContent=a?(a.nome||'—'):'Aguardando';document.getElementById('tvSala').textContent=a?(a.ponto||''):'';document.getElementById('tvList').innerHTML=ultimas.slice(1,5).map(q=>`<div class="tv-row"><div class="s">${q.codigo}</div><div class="nn">${esc(q.nome||'—')}<small>${esc(q.modalidade)}</small></div><div class="sl">${esc(q.ponto||'')}</div></div>`).join('');}
-function tick(){const d=new Date(),c=document.getElementById('tvClock'),t=document.getElementById('tvToday');if(c)c.textContent=d.toLocaleTimeString('pt-BR',{timeZone:TZ,hour:'2-digit',minute:'2-digit'});if(t)t.textContent=d.toLocaleDateString('pt-BR',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'});}tick();setInterval(tick,10000);
-const conn=new signalR.HubConnectionBuilder().withUrl('/hubs/senha').withAutomaticReconnect().build();conn.on('UltimasChamadas',u=>{ultimas=u;render()});conn.on('SenhaChamada',()=>{const e=document.getElementById('tvCurrent');e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash')});conn.start().then(()=>conn.invoke('EntrarNaFilial',filialId)).catch(console.error);render();
-</script>}
+@{
+    Layout = "_LayoutPublic";
+    ViewData["Title"] = "Painel TV";
+    var p = Model.Personalizacao;
+}
+@await Html.PartialAsync("_TemaPublico", p)
+
+@if (Model.Oculta)
+{
+    <div class="public active"><div class="tv-off">Esta tela está desativada.<br><small style="font-size:16px;opacity:.7">Ative em Telas &gt; Visível.</small></div></div>
+}
+else
+{
+<div class="public active">
+    <div class="tv-top">
+        <div class="mk">@if (!string.IsNullOrWhiteSpace(p.LogoUrl)) {<img src="@p.LogoUrl" alt="Logo" style="max-width:100%;max-height:100%">}</div>
+        <div><h1>@p.Marca</h1><small>@Model.Subtitulo</small></div>
+        @if (p.MostrarHorario) {<div class="tvclock"><div class="t" id="tvClock">--:--</div><div class="d" id="tvToday"></div></div>}
+    </div>
+    <div class="tv-body">
+        <div class="tv-current" id="tvCurrent">
+            <div class="lbl">Senha</div>
+            <div class="senha" id="tvSenha" style="@(p.MostrarNumero ? "" : "display:none")">—</div>
+            <div class="nm" id="tvNome">Aguardando</div>
+            <div class="sala" id="tvSala" style="@(p.MostrarSala ? "" : "display:none")"></div>
+        </div>
+        <div class="tv-side" style="@(p.MostrarOrdem ? "" : "display:none")">
+            <div class="sh">Últimas chamadas</div>
+            <div class="list" id="tvList"></div>
+            <div class="tv-media">
+                @if (p.VideoEmbedUrl is string embed)
+                {
+                    <iframe src="@embed" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" title="Vídeo"></iframe>
+                }
+                else if (!string.IsNullOrWhiteSpace(p.VideoUrl))
+                {
+                    <video src="@p.VideoUrl" autoplay muted loop playsinline></video>
+                }
+                else
+                {
+                    <span>Área de vídeo / publicidade</span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+@if (p.AvisoChamada != AvisoChamada.Nenhum)
+{
+    <button class="som-btn" id="somBtn" type="button">Ativar som das chamadas</button>
+}
+}
+
+@section Scripts {
+@if (!Model.Oculta)
+{
+<script>
+(() => {
+    const cfg = {
+        telaId: @(Model.TelaId?.ToString() ?? "null"),
+        filialId: @Model.FilialId,
+        aviso: @((int)p.AvisoChamada),          // 0 nenhum, 1 som, 2 som + voz
+        mostrarSala: @(p.MostrarSala ? "true" : "false")
+    };
+    let ultimas = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Ultimas));
+    const TZ = 'America/Sao_Paulo';
+    const $ = id => document.getElementById(id);
+    const esc = s => (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    function render() {
+        const a = ultimas[0];
+        $('tvSenha').textContent = a ? a.codigo : '—';
+        $('tvNome').textContent = a ? (a.nome || '') : 'Aguardando';
+        $('tvSala').textContent = a ? (a.ponto || '') : '';
+        $('tvList').innerHTML = ultimas.slice(1, 5).map(q =>
+            `<div class="tv-row"><div class="s">${esc(q.codigo)}</div><div class="nn">${esc(q.nome || '')}<small>${esc(q.modalidade)}</small></div><div class="sl">${esc(q.ponto || '')}</div></div>`).join('');
+    }
+
+    async function carregar() {
+        const qs = cfg.telaId ? `telaId=${cfg.telaId}` : `filialId=${cfg.filialId}`;
+        try {
+            const r = await fetch(`/api/tv/ultimas?${qs}`, { cache: 'no-store' });
+            if (!r.ok) return;
+            const j = await r.json();
+            if (j.oculta) { location.reload(); return; }
+            ultimas = j.chamadas || [];
+            render();
+        } catch { /* sem conexão: mantém a última tela */ }
+    }
+
+    // ---- Aviso sonoro / voz ----
+    let ctx = null;
+    function beep() {
+        if (!ctx || ctx.state !== 'running') return;
+        const t = ctx.currentTime;
+        [[880, 0], [660, 0.28]].forEach(([f, d]) => {
+            const o = ctx.createOscillator(), g = ctx.createGain();
+            o.frequency.value = f; o.type = 'sine';
+            g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.4, t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.25);
+            o.connect(g).connect(ctx.destination); o.start(t + d); o.stop(t + d + 0.27);
+        });
+    }
+    function falar(a) {
+        if (cfg.aviso !== 2 || !('speechSynthesis' in window)) return;
+        const codigo = a.codigo.split('').join(' ');
+        const texto = `Senha ${codigo}` + (cfg.mostrarSala && a.ponto ? `, ${a.ponto}` : '');
+        const u = new SpeechSynthesisUtterance(texto); u.lang = 'pt-BR';
+        speechSynthesis.cancel(); setTimeout(() => speechSynthesis.speak(u), 650);
+    }
+    function avisar(a) {
+        const e = $('tvCurrent'); e.classList.remove('flash'); void e.offsetWidth; e.classList.add('flash');
+        if (cfg.aviso >= 1) { beep(); falar(a); }
+    }
+    const somBtn = $('somBtn');
+    if (somBtn) {
+        // Com o Chrome em --autoplay-policy=no-user-gesture-required o áudio já nasce liberado e o botão some.
+        try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { }
+        if (ctx && ctx.state === 'running') somBtn.remove();
+        somBtn.onclick = () => { try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume(); } catch { } somBtn.remove(); };
+    }
+
+    // ---- Relógio (São Paulo) ----
+    function tick() {
+        const d = new Date(), c = $('tvClock'), t = $('tvToday');
+        if (c) c.textContent = d.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+        if (t) t.textContent = d.toLocaleDateString('pt-BR', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' });
+    }
+    tick(); setInterval(tick, 10000);
+
+    // ---- Tempo real (sem dados de paciente no canal público) ----
+    const conn = new signalR.HubConnectionBuilder().withUrl('/hubs/senha').withAutomaticReconnect().build();
+    conn.on('Atualizar', carregar);
+    conn.on('Chamada', async id => { await carregar(); if (ultimas[0] && ultimas[0].id === id) avisar(ultimas[0]); });
+    const entrar = () => conn.invoke('EntrarComoTela', cfg.filialId);
+    conn.onreconnected(() => { entrar(); carregar(); });
+    conn.start().then(entrar).catch(console.error);
+    setInterval(carregar, 60000); // segurança caso o tempo real caia
+    render();
+})();
+</script>
+}
+}

@@ -4,26 +4,27 @@ using MegaScreen.Web.Services;
 
 namespace MegaScreen.Web.Hubs;
 
-// Hub de tempo real: painel do atendente, TV pública e tela do profissional
-// entram no grupo da filial e recebem "FilaAtualizada" / "UltimasChamadas" / "SenhaChamada".
+// Hub de tempo real.
+// - Equipe logada (painel / profissional): EntrarNaFilial -> recebe "FilaAtualizada" e "SenhaChamada" com dados completos.
+// - TV pública: EntrarComoTela -> recebe só "Atualizar" e "Chamada"(id), sem dados de paciente (LGPD).
 public class SenhaHub : Hub
 {
     public async Task EntrarNaFilial(int filialId)
     {
-        // Usuário logado só entra na própria filial (Admin pode qualquer uma).
-        // TV e totem (anônimos) continuam entrando pela filial da URL.
         var user = Context.User;
-        if (user?.Identity?.IsAuthenticated == true && !user.IsInRole("Admin"))
-        {
-            var minhaFilial = user.FindFirstValue("FilialId");
-            if (minhaFilial != filialId.ToString())
-                throw new HubException("Acesso negado a esta filial.");
-        }
+        if (user?.Identity?.IsAuthenticated != true)
+            throw new HubException("Faça login para acompanhar a fila.");
+        if (!user.IsInRole("Admin") && user.FindFirstValue("FilialId") != filialId.ToString())
+            throw new HubException("Acesso negado a esta filial.");
         await Groups.AddToGroupAsync(Context.ConnectionId, SenhaService.Grupo(filialId));
     }
+
+    public Task EntrarComoTela(int filialId)
+        => Groups.AddToGroupAsync(Context.ConnectionId, SenhaService.GrupoTv(filialId));
 
     public async Task SairDaFilial(int filialId)
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, SenhaService.Grupo(filialId));
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, SenhaService.GrupoTv(filialId));
     }
 }

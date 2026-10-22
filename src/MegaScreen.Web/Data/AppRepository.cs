@@ -47,6 +47,23 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
             """, new { id, filialId, nome, localAtual });
     }
 
+    public async Task AtualizarLocalAtualAsync(int id, string? localAtual)
+    {
+        using var db = Open();
+        await db.ExecuteAsync("UPDATE Usuarios SET LocalAtual=@localAtual WHERE Id=@id;", new { id, localAtual });
+    }
+
+    /// <summary>Senhas aguardando hoje (contador do menu).</summary>
+    public async Task<int> ContarAguardandoHojeAsync(int filialId)
+    {
+        using var db = Open();
+        var hoje = DataHora.Hoje();
+        return await db.ExecuteScalarAsync<int>("""
+            SELECT COUNT(*) FROM Senhas
+            WHERE FilialId=@filialId AND Status=@aguardando AND CriadaEm>=@hoje AND CriadaEm<@amanha;
+            """, new { filialId, aguardando=(int)StatusSenha.Aguardando, hoje, amanha=hoje.AddDays(1) });
+    }
+
     public async Task AlterarSenhaAsync(int id, int filialId, string senhaHash)
     {
         using var db = Open();
@@ -100,9 +117,14 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
     public async Task<List<Cliente>> ListarClientesAsync()
     {
         using var db = Open();
+        var hoje = DataHora.Hoje();
+        var inicioMes = new DateTime(hoje.Year, hoje.Month, 1);
         var rows = (await db.QueryAsync<Cliente>("""
-            SELECT Id, Nome, Tipo, Documento, Ativo FROM Clientes ORDER BY Nome;
-            """)).ToList();
+            SELECT c.Id, c.Nome, c.Tipo, c.Documento, c.Ativo,
+                   (SELECT COUNT(*) FROM Senhas s INNER JOIN Filiais f ON f.Id=s.FilialId
+                     WHERE f.ClienteId=c.Id AND s.CriadaEm>=@inicioMes AND s.CriadaEm<@proximoMes) SenhasMes
+            FROM Clientes c ORDER BY c.Nome;
+            """, new { inicioMes, proximoMes = inicioMes.AddMonths(1) })).ToList();
         foreach (var c in rows)
             c.Filiais = (await db.QueryAsync<Filial>("""
                 SELECT Id, ClienteId, Nome, Cidade, Uf, ImpressoraHabilitada, Ativa
@@ -215,7 +237,7 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
     {
         using var db = Open();
         return (await db.QueryAsync<Sala>("""
-            SELECT Id,FilialId,Nome,Apelido,Predio,Andar,Ramal,Cor
+            SELECT Id,FilialId,Nome,Apelido,Predio,Andar,Ramal,Cor,SalaEsperaId
             FROM Salas WHERE FilialId=@filialId ORDER BY Nome;
             """,new { filialId })).ToList();
     }
@@ -225,12 +247,14 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
         using var db = Open();
         if (item.Id==0)
             await db.ExecuteAsync("""
-                INSERT INTO Salas (FilialId,Nome,Apelido,Predio,Andar,Ramal,Cor)
-                VALUES (@FilialId,@Nome,@Apelido,@Predio,@Andar,@Ramal,@Cor);
+                INSERT INTO Salas (FilialId,Nome,Apelido,Predio,Andar,Ramal,Cor,SalaEsperaId)
+                VALUES (@FilialId,@Nome,@Apelido,@Predio,@Andar,@Ramal,@Cor,
+                        (SELECT se.Id FROM SalasEspera se WHERE se.Id=@SalaEsperaId AND se.FilialId=@FilialId));
                 """,item);
         else
             await db.ExecuteAsync("""
-                UPDATE Salas SET Nome=@Nome,Apelido=@Apelido,Predio=@Predio,Andar=@Andar,Ramal=@Ramal,Cor=@Cor
+                UPDATE Salas SET Nome=@Nome,Apelido=@Apelido,Predio=@Predio,Andar=@Andar,Ramal=@Ramal,Cor=@Cor,
+                    SalaEsperaId=(SELECT se.Id FROM SalasEspera se WHERE se.Id=@SalaEsperaId AND se.FilialId=@FilialId)
                 WHERE Id=@Id AND FilialId=@FilialId;
                 """,item);
     }
@@ -271,6 +295,38 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
                 """,new { item.Id,item.FilialId,item.Nome,item.Apelido,Tipo=(int)item.Tipo,item.Predio,item.Andar,item.Ramal,item.Cor,item.Visivel,item.SalaEsperaId });
     }
 
+    public async Task<Tela?> ObterTelaAsync(int id)
+    {
+        using var db = Open();
+        var rows = await db.QueryAsync<Tela,SalaEspera?,Tela>("""
+            SELECT t.Id,t.FilialId,t.Nome,t.Apelido,t.Tipo,t.Predio,t.Andar,t.Ramal,t.Cor,t.Visivel,t.SalaEsperaId,
+                   s.Id,s.FilialId,s.Nome,s.Apelido
+            FROM Telas t LEFT JOIN SalasEspera s ON s.Id=t.SalaEsperaId
+            WHERE t.Id=@id;
+            """,(t,s)=>{ t.SalaEspera=s; return t; },new { id },splitOn:"Id");
+        return rows.FirstOrDefault();
+    }
+
+    /// <summary>Define quais telas pertencem à sala de espera (desvincula as que foram desmarcadas).</summary>
+    public async Task AssociarTelasAsync(int salaEsperaId,int filialId,IEnumerable<int> telaIds)
+    {
+        var ids = telaIds.Distinct().ToArray();
+        using var db = Open();
+        db.Open();
+        using var tx = db.BeginTransaction();
+        await db.ExecuteAsync("""
+            UPDATE Telas SET SalaEsperaId=NULL
+            WHERE FilialId=@filialId AND SalaEsperaId=@salaEsperaId;
+            """,new { filialId,salaEsperaId },tx);
+        if (ids.Length > 0)
+            await db.ExecuteAsync("""
+                UPDATE Telas SET SalaEsperaId=@salaEsperaId
+                WHERE FilialId=@filialId AND Id IN @ids
+                  AND EXISTS (SELECT 1 FROM SalasEspera se WHERE se.Id=@salaEsperaId AND se.FilialId=@filialId);
+                """,new { filialId,salaEsperaId,ids },tx);
+        tx.Commit();
+    }
+
     public async Task ExcluirTelaAsync(int id,int filialId)
     {
         using var db = Open();
@@ -304,13 +360,17 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
             """,new { filialId })).ToList();
     }
 
-    public async Task SalvarSalaEsperaAsync(SalaEspera item)
+    /// <summary>Salva e devolve o Id da sala de espera.</summary>
+    public async Task<int> SalvarSalaEsperaAsync(SalaEspera item)
     {
         using var db = Open();
         if (item.Id==0)
-            await db.ExecuteAsync("INSERT INTO SalasEspera (FilialId,Nome,Apelido) VALUES (@FilialId,@Nome,@Apelido);",item);
-        else
-            await db.ExecuteAsync("UPDATE SalasEspera SET Nome=@Nome,Apelido=@Apelido WHERE Id=@Id AND FilialId=@FilialId;",item);
+            return await db.ExecuteScalarAsync<int>("""
+                INSERT INTO SalasEspera (FilialId,Nome,Apelido) VALUES (@FilialId,@Nome,@Apelido);
+                SELECT CAST(SCOPE_IDENTITY() AS int);
+                """,item);
+        await db.ExecuteAsync("UPDATE SalasEspera SET Nome=@Nome,Apelido=@Apelido WHERE Id=@Id AND FilialId=@FilialId;",item);
+        return item.Id;
     }
 
     public async Task ExcluirSalaEsperaAsync(int id,int filialId)
@@ -319,6 +379,7 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
         db.Open();
         using var tx=db.BeginTransaction();
         await db.ExecuteAsync("UPDATE Telas SET SalaEsperaId=NULL WHERE SalaEsperaId=@id AND FilialId=@filialId;",new { id,filialId },tx);
+        await db.ExecuteAsync("UPDATE Salas SET SalaEsperaId=NULL WHERE SalaEsperaId=@id AND FilialId=@filialId;",new { id,filialId },tx);
         await db.ExecuteAsync("DELETE FROM PontosAtendimento WHERE SalaEsperaId=@id;",new { id },tx);
         await db.ExecuteAsync("DELETE FROM SalasEspera WHERE Id=@id AND FilialId=@filialId;",new { id,filialId },tx);
         tx.Commit();
@@ -335,6 +396,18 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
             await db.ExecuteAsync("UPDATE PontosAtendimento SET SalaEsperaId=@SalaEsperaId,Nome=@Nome,Ativo=@Ativo WHERE Id=@Id;",item);
     }
 
+    /// <summary>Pausa / reativa o ponto de atendimento.</summary>
+    public async Task AlternarPontoAsync(int id,int filialId)
+    {
+        using var db=Open();
+        await db.ExecuteAsync("""
+            UPDATE p SET p.Ativo = CASE WHEN p.Ativo=1 THEN 0 ELSE 1 END
+            FROM PontosAtendimento p
+            INNER JOIN SalasEspera s ON s.Id=p.SalaEsperaId
+            WHERE p.Id=@id AND s.FilialId=@filialId;
+            """,new { id,filialId });
+    }
+
     public async Task ExcluirPontoAsync(int id,int filialId)
     {
         using var db=Open();
@@ -349,11 +422,15 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
     {
         using var db=Open();
         var p=await db.QueryFirstOrDefaultAsync<PersonalizacaoGeral>("""
-            SELECT FilialId,CorFundo,CorTexto,CorDestaque,Fonte,MostrarHorario,MostrarNumero,MostrarOrdem,MostrarSala,
-                   LogoUrl,FundoUrl,VideoUrl,Marca
+            SELECT FilialId,CorFundo,CorTexto,CorDestaque,CorSecundaria,Fonte,MostrarHorario,MostrarNumero,MostrarOrdem,MostrarSala,
+                   LogoUrl,FundoUrl,VideoUrl,Marca,MidiaUrl,FonteLateralPx,FundoPadrao,NomeNaTv,AvisoChamada,AlertaEsperaMin
             FROM Personalizacoes WHERE FilialId=@filialId;
             """,new { filialId });
-        return p ?? new PersonalizacaoGeral { FilialId=filialId };
+        p ??= new PersonalizacaoGeral { FilialId=filialId };
+        // Colunas que aceitam NULL no banco: garante valores padrão para as telas.
+        if (string.IsNullOrWhiteSpace(p.Marca)) p.Marca = "Sua Marca";
+        if (string.IsNullOrWhiteSpace(p.Fonte)) p.Fonte = "Manrope";
+        return p;
     }
 
     public async Task SalvarPersonalizacaoAsync(PersonalizacaoGeral p)
@@ -362,17 +439,22 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
         await db.ExecuteAsync("""
             MERGE Personalizacoes AS target
             USING (SELECT @FilialId AS FilialId) AS src ON target.FilialId=src.FilialId
-            WHEN MATCHED THEN UPDATE SET CorFundo=@CorFundo,CorTexto=@CorTexto,CorDestaque=@CorDestaque,
+            WHEN MATCHED THEN UPDATE SET CorFundo=@CorFundo,CorTexto=@CorTexto,CorDestaque=@CorDestaque,CorSecundaria=@CorSecundaria,
                 Fonte=@Fonte,MostrarHorario=@MostrarHorario,MostrarNumero=@MostrarNumero,MostrarOrdem=@MostrarOrdem,
                 MostrarSala=@MostrarSala,LogoUrl=@LogoUrl,FundoUrl=@FundoUrl,VideoUrl=@VideoUrl,Marca=@Marca,
+                MidiaUrl=@MidiaUrl,FonteLateralPx=@FonteLateralPx,FundoPadrao=@FundoPadrao,NomeNaTv=@NomeNaTv,
+                AvisoChamada=@AvisoChamada,AlertaEsperaMin=@AlertaEsperaMin,
                 AtualizadoEm=@AtualizadoEm
             WHEN NOT MATCHED THEN INSERT
-                (FilialId,CorFundo,CorTexto,CorDestaque,Fonte,MostrarHorario,MostrarNumero,MostrarOrdem,MostrarSala,LogoUrl,FundoUrl,VideoUrl,Marca,AtualizadoEm)
-                VALUES (@FilialId,@CorFundo,@CorTexto,@CorDestaque,@Fonte,@MostrarHorario,@MostrarNumero,@MostrarOrdem,@MostrarSala,@LogoUrl,@FundoUrl,@VideoUrl,@Marca,@AtualizadoEm);
+                (FilialId,CorFundo,CorTexto,CorDestaque,CorSecundaria,Fonte,MostrarHorario,MostrarNumero,MostrarOrdem,MostrarSala,LogoUrl,FundoUrl,VideoUrl,Marca,
+                 MidiaUrl,FonteLateralPx,FundoPadrao,NomeNaTv,AvisoChamada,AlertaEsperaMin,AtualizadoEm)
+                VALUES (@FilialId,@CorFundo,@CorTexto,@CorDestaque,@CorSecundaria,@Fonte,@MostrarHorario,@MostrarNumero,@MostrarOrdem,@MostrarSala,@LogoUrl,@FundoUrl,@VideoUrl,@Marca,
+                 @MidiaUrl,@FonteLateralPx,@FundoPadrao,@NomeNaTv,@AvisoChamada,@AlertaEsperaMin,@AtualizadoEm);
             """,new
             {
-                p.FilialId,p.CorFundo,p.CorTexto,p.CorDestaque,p.Fonte,p.MostrarHorario,p.MostrarNumero,p.MostrarOrdem,p.MostrarSala,
+                p.FilialId,p.CorFundo,p.CorTexto,p.CorDestaque,p.CorSecundaria,p.Fonte,p.MostrarHorario,p.MostrarNumero,p.MostrarOrdem,p.MostrarSala,
                 p.LogoUrl,p.FundoUrl,p.VideoUrl,p.Marca,
+                p.MidiaUrl,p.FonteLateralPx,p.FundoPadrao,NomeNaTv=(int)p.NomeNaTv,AvisoChamada=(int)p.AvisoChamada,p.AlertaEsperaMin,
                 AtualizadoEm=DataHora.Agora()
             });
     }

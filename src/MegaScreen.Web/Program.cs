@@ -115,6 +115,38 @@ api.MapGet("/fila", async (HttpContext http, SenhaService svc) =>
     Results.Json((await svc.FilaAsync(http.User.FilialId())).Select(SenhaDto.From)))
     .RequireAuthorization();
 
+api.MapGet("/stats", async (HttpContext http, AppRepository repo) =>
+{
+    var st = await repo.ObterDashboardAsync(http.User.FilialId());
+    return Results.Json(new PainelStatsDto
+    {
+        Aguardando = st.Aguardando,
+        EmAtendimento = st.EmAtendimento,
+        ConcluidosHoje = st.ConcluidosHoje,
+        EsperaMediaSegundos = st.EsperaMediaSegundos
+    });
+}).RequireAuthorization();
+
+// TV pública: por tela (filtra pela sala de espera) ou pela filial inteira. Nome conforme LGPD.
+app.MapGet("/api/tv/ultimas", async (int? telaId, int? filialId, AppRepository repo, SenhaService svc) =>
+{
+    int fid;
+    int? salaEsperaId = null;
+    if (telaId is > 0)
+    {
+        var tela = await repo.ObterTelaAsync(telaId.Value);
+        if (tela is null) return Results.NotFound(new { erro = "Tela não encontrada." });
+        if (!tela.Visivel) return Results.Json(new { oculta = true, chamadas = Array.Empty<TvChamadaDto>() });
+        fid = tela.FilialId;
+        salaEsperaId = tela.SalaEsperaId;
+    }
+    else if (filialId is > 0) fid = filialId.Value;
+    else return Results.BadRequest(new { erro = "Informe a tela ou a filial." });
+
+    var p = await repo.ObterPersonalizacaoAsync(fid);
+    return Results.Json(new { oculta = false, chamadas = await svc.UltimasParaTvAsync(fid, salaEsperaId, p) });
+}).AllowAnonymous();
+
 api.MapPost("/emitir/{filialId:int}", async (int filialId, NovaSenhaViewModel vm, SenhaService svc) =>
 {
     if (vm.ModalidadeId <= 0 || !Enum.IsDefined(typeof(Prioridade), vm.Prioridade))

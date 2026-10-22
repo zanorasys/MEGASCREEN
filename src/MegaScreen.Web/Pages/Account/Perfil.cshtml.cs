@@ -16,11 +16,13 @@ public sealed class PerfilModel(AppRepository repository) : PageModel
     [BindProperty] public string? SenhaAtual { get; set; }
     [BindProperty] public string? NovaSenha { get; set; }
     [BindProperty] public string? Confirmacao { get; set; }
+    public string Email { get; private set; } = "";
 
     public async Task<IActionResult> OnGetAsync()
     {
         var user = await repository.ObterUsuarioAsync(User.UsuarioId(), User.FilialId());
         if (user is null) return NotFound();
+        Email = user.Email;
         Nome = user.Nome;
         LocalAtual = user.LocalAtual;
         return Page();
@@ -30,6 +32,7 @@ public sealed class PerfilModel(AppRepository repository) : PageModel
     {
         var user = await repository.ObterUsuarioAsync(User.UsuarioId(), User.FilialId());
         if (user is null) return NotFound();
+        Email = user.Email;
 
         if (string.IsNullOrWhiteSpace(Nome)) ModelState.AddModelError(nameof(Nome), "Informe seu nome.");
         if (!string.IsNullOrWhiteSpace(NovaSenha))

@@ -56,22 +56,40 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
         return result.ToList();
     }
 
-    /// <summary>Últimas senhas chamadas hoje (mais recente primeiro), usado na lateral da TV.</summary>
-    public async Task<List<Senha>> UltimasChamadasAsync(int filialId, int quantidade = 5)
+    /// <summary>Últimas senhas chamadas hoje (mais recente primeiro).
+    /// Com salaEsperaId, traz só as chamadas dos guichês dessa sala de espera e das salas (destino) vinculadas a ela
+    /// ou sem vínculo. Sem salaEsperaId, traz a filial inteira.</summary>
+    public async Task<List<Senha>> UltimasChamadasAsync(int filialId, int? salaEsperaId = null, int quantidade = 5)
     {
         var sql = "SELECT TOP (@quantidade) " + ColunasSenha + """
 
             WHERE s.FilialId = @filialId
               AND s.ChamadaEm IS NOT NULL
               AND s.ChamadaEm >= @hoje AND s.ChamadaEm < @amanha
+              AND (@salaEsperaId IS NULL
+                   OR EXISTS (SELECT 1 FROM PontosAtendimento p
+                              WHERE p.SalaEsperaId = @salaEsperaId AND p.Nome = s.PontoAtendimento)
+                   OR EXISTS (SELECT 1 FROM Salas sa
+                              WHERE sa.Id = s.SalaId AND (sa.SalaEsperaId = @salaEsperaId OR sa.SalaEsperaId IS NULL)))
             ORDER BY s.ChamadaEm DESC;
             """;
         var hoje = DataHora.Hoje();
         using var db = connectionFactory.CreateConnection();
         var result = await db.QueryAsync<Senha, Modalidade, Senha>(sql, Mapear,
-            new { filialId, quantidade, hoje, amanha = hoje.AddDays(1) }, splitOn: "Id");
+            new { filialId, salaEsperaId, quantidade, hoje, amanha = hoje.AddDays(1) }, splitOn: "Id");
         return result.ToList();
     }
+
+    /// <summary>Lista para a TV pública, com o nome formatado pela regra da Personalização.</summary>
+    public async Task<List<TvChamadaDto>> UltimasParaTvAsync(int filialId, int? salaEsperaId, PersonalizacaoGeral p)
+        => (await UltimasChamadasAsync(filialId, salaEsperaId)).Select(s => new TvChamadaDto
+        {
+            Id = s.Id,
+            Codigo = s.Codigo,
+            Nome = p.NomePublico(s.Nome),
+            Modalidade = s.Modalidade?.Nome ?? "",
+            Ponto = s.PontoAtendimento
+        }).ToList();
 
     public async Task<Senha> EmitirAsync(int filialId, NovaSenhaViewModel vm)
     {
@@ -155,7 +173,7 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
         var senha = await ObterComModalidadeAsync(db, filialId, senhaId)
             ?? throw new RegraNegocioException("Senha não encontrada.");
 
-        await hub.Clients.Group(Grupo(filialId)).SendAsync("SenhaChamada", SenhaDto.From(senha));
+        await AvisarChamada(filialId, senha);
         await Broadcast(filialId);
     }
 
@@ -196,7 +214,7 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
         if (senha.Status != StatusSenha.EmAtendimento)
             throw new RegraNegocioException("Só é possível rechamar uma senha em atendimento.");
 
-        await hub.Clients.Group(Grupo(filialId)).SendAsync("SenhaChamada", SenhaDto.From(senha));
+        await AvisarChamada(filialId, senha);
         await Broadcast(filialId);
     }
 
@@ -229,14 +247,21 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
             .FirstOrDefault();
     }
 
+    // Equipe (logada) recebe os dados completos. TVs públicas recebem só o id da senha chamada e
+    // buscam a própria lista em /api/tv, já filtrada pela sala de espera e com o nome conforme a LGPD.
+    private async Task AvisarChamada(int filialId, Senha senha)
+    {
+        await hub.Clients.Group(Grupo(filialId)).SendAsync("SenhaChamada", SenhaDto.From(senha));
+        await hub.Clients.Group(GrupoTv(filialId)).SendAsync("Chamada", senha.Id);
+    }
+
     private async Task Broadcast(int filialId)
     {
         var fila = (await FilaAsync(filialId)).Select(SenhaDto.From).ToList();
-        var ultimas = (await UltimasChamadasAsync(filialId)).Select(SenhaDto.From).ToList();
-        var grupo = hub.Clients.Group(Grupo(filialId));
-        await grupo.SendAsync("FilaAtualizada", fila);
-        await grupo.SendAsync("UltimasChamadas", ultimas);
+        await hub.Clients.Group(Grupo(filialId)).SendAsync("FilaAtualizada", fila);
+        await hub.Clients.Group(GrupoTv(filialId)).SendAsync("Atualizar");
     }
 
     public static string Grupo(int filialId) => $"filial-{filialId}";
+    public static string GrupoTv(int filialId) => $"tv-{filialId}";
 }

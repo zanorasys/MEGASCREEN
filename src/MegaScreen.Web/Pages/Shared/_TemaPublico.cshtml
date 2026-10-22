@@ -1,0 +1,29 @@
+@model MegaScreen.Web.Models.PersonalizacaoGeral
+@{
+    // Fonte só da lista permitida (evita injeção de CSS); Arial/Verdana são do sistema.
+    var fonte = MegaScreen.Web.Models.PersonalizacaoGeral.FontesPermitidas.Contains(Model.Fonte) ? Model.Fonte : "Manrope";
+    var google = fonte is "Manrope" or "Inter" or "Roboto" or "Space Grotesk";
+    var lat = Math.Clamp(Model.FonteLateralPx, 10, 24);
+}
+@if (google)
+{
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=@(fonte.Replace(' ', '+')):wght@400;600;700;800&display=swap" />
+}
+<style>
+    :root{--tvbg:@Model.CorFundo;--tvtext:@Model.CorTexto;--tvaccent:@Model.CorDestaque;--tvsec:@Model.CorSecundaria}
+    .public,.totem{background:@Html.Raw(Model.FundoCss);color:var(--tvtext);font-family:"@fonte",sans-serif}
+    .tv-top{background:linear-gradient(90deg,var(--tvaccent),var(--tvsec))}
+    .tv-current .senha{-webkit-text-fill-color:var(--tvtext)}
+    .tv-current .sala{background:var(--tvaccent)}
+    .tv-row .nn{font-size:@(lat + 3)px}
+    .tv-row .sl{font-size:@(lat + 4)px}
+    .tv-row .s{font-size:@(Math.Round(lat * 2.14))px}
+    .tbtn .ti{background:var(--tvaccent)}
+    .tv-media iframe,.tv-media video{width:100%;height:100%;border:0;object-fit:cover}
+    .tv-off{position:fixed;inset:0;display:grid;place-items:center;text-align:center;font-size:28px;font-weight:700;padding:24px}
+    .som-btn{position:fixed;right:18px;bottom:18px;z-index:400;background:var(--tvaccent);color:#fff;border:0;border-radius:12px;padding:12px 18px;font-weight:800;font-size:15px;cursor:pointer}
+    @if (!string.IsNullOrWhiteSpace(Model.FundoUrl))
+    {
+        <text>.public,.totem{background-image:linear-gradient(rgba(11,13,36,.55),rgba(11,13,36,.55)),url('@Model.FundoUrl');background-size:cover;background-position:center}</text>
+    }
+</style>

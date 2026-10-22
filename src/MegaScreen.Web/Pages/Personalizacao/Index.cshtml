@@ -1,15 +1,130 @@
 @page
 @model MegaScreen.Web.Pages.Personalizacao.IndexModel
-@{ViewData["Title"]="Personalização";}
-<div class="page-head"><div><h2>Personalização (Aparência)</h2><p>Ajuste a identidade visual das telas públicas, como no protótipo.</p></div></div>
+@{
+    ViewData["Title"] = "Personalização";
+    var it = Model.Item;
+}
+<div class="page-head"><div><h2>Personalização (Aparência)</h2><p>Identidade visual da TV e do totem desta filial. A pré-visualização ao lado muda enquanto você edita.</p></div></div>
 <form method="post" enctype="multipart/form-data">
 <div asp-validation-summary="All" class="validation"></div>
 <div class="cfg-grid">
 <div class="stack">
-<div class="card"><div class="card-head"><h2>Marca e cores</h2></div><div class="form-pad"><div class="field"><label>Nome da marca</label><input asp-for="Item.Marca"></div><div class="colorline"><span class="cn">Cor de fundo</span><span class="val">@Model.Item.CorFundo</span><input asp-for="Item.CorFundo" type="color"></div><div class="colorline"><span class="cn">Cor do texto</span><span class="val">@Model.Item.CorTexto</span><input asp-for="Item.CorTexto" type="color"></div><div class="colorline"><span class="cn">Cor de destaque</span><span class="val">@Model.Item.CorDestaque</span><input asp-for="Item.CorDestaque" type="color"></div><div class="field"><label>Fonte</label><select asp-for="Item.Fonte"><option>Manrope</option><option>Space Grotesk</option><option>Arial</option><option>Verdana</option></select></div></div></div>
-<div class="card"><div class="card-head"><h2>Exibição</h2></div><div class="form-pad"><div class="toggle-row"><div class="tx">Mostrar horário<small>Relógio no topo do painel</small></div><div class="sw"><input asp-for="Item.MostrarHorario"><label asp-for="Item.MostrarHorario"></label></div></div><div class="toggle-row"><div class="tx">Número da chamada<small>Senha em destaque</small></div><div class="sw"><input asp-for="Item.MostrarNumero"><label asp-for="Item.MostrarNumero"></label></div></div><div class="toggle-row"><div class="tx">Ordem de chamada<small>Lista lateral</small></div><div class="sw"><input asp-for="Item.MostrarOrdem"><label asp-for="Item.MostrarOrdem"></label></div></div><div class="toggle-row"><div class="tx">Sala / guichê<small>Destino do atendimento</small></div><div class="sw"><input asp-for="Item.MostrarSala"><label asp-for="Item.MostrarSala"></label></div></div></div></div>
+    <div class="card"><div class="card-head"><h2>Marca e cores</h2></div><div class="form-pad">
+        <div class="field"><label>Nome da marca</label><input asp-for="Item.Marca" data-pv="marca"></div>
+        <div class="colorline"><span class="cn">Cor de fundo</span><span class="val" data-val="CorFundo">@it.CorFundo</span><input asp-for="Item.CorFundo" type="color" data-pv="bg"></div>
+        <div class="colorline"><span class="cn">Cor do texto</span><span class="val" data-val="CorTexto">@it.CorTexto</span><input asp-for="Item.CorTexto" type="color" data-pv="tx"></div>
+        <div class="colorline"><span class="cn">Cor de destaque (senha)</span><span class="val" data-val="CorDestaque">@it.CorDestaque</span><input asp-for="Item.CorDestaque" type="color" data-pv="ac"></div>
+        <div class="colorline"><span class="cn">Cor secundária (degradê do topo)</span><span class="val" data-val="CorSecundaria">@it.CorSecundaria</span><input asp-for="Item.CorSecundaria" type="color" data-pv="sec"></div>
+    </div></div>
+
+    <div class="card"><div class="card-head"><h2>Exibição</h2></div><div class="form-pad">
+        <div class="toggle-row"><div class="tx">Mostrar horário<small>Relógio no topo do painel</small></div><div class="sw"><input asp-for="Item.MostrarHorario" data-pv="hora"><label asp-for="Item.MostrarHorario"></label></div></div>
+        <div class="toggle-row"><div class="tx">Número da chamada<small>Senha em destaque</small></div><div class="sw"><input asp-for="Item.MostrarNumero" data-pv="num"><label asp-for="Item.MostrarNumero"></label></div></div>
+        <div class="toggle-row"><div class="tx">Ordem de chamada<small>Lista lateral de últimas chamadas</small></div><div class="sw"><input asp-for="Item.MostrarOrdem" data-pv="ordem"><label asp-for="Item.MostrarOrdem"></label></div></div>
+        <div class="toggle-row"><div class="tx">Sala / guichê<small>Destino do atendimento</small></div><div class="sw"><input asp-for="Item.MostrarSala" data-pv="sala"><label asp-for="Item.MostrarSala"></label></div></div>
+        <div class="form2" style="margin-top:12px">
+            <div class="field"><label>Nome do paciente na TV (LGPD)</label>
+                <select asp-for="Item.NomeNaTv" data-pv="nome">
+                    <option value="1">Primeiro nome + inicial (Lucas R.)</option>
+                    <option value="2">Nome completo</option>
+                    <option value="0">Não mostrar nome</option>
+                </select></div>
+            <div class="field"><label>Aviso na chamada</label>
+                <select asp-for="Item.AvisoChamada">
+                    <option value="1">Som</option>
+                    <option value="2">Som + voz ("Senha A 0 4 6, Guichê 3")</option>
+                    <option value="0">Sem aviso sonoro</option>
+                </select></div>
+            <div class="field"><label>Alerta de espera no painel (min)</label><input asp-for="Item.AlertaEsperaMin" type="number" min="0" max="240"><small class="hint">O sino avisa senhas aguardando acima deste tempo. 0 desliga.</small></div>
+        </div>
+    </div></div>
+
+    <div class="card"><div class="card-head"><h2>Fontes e tamanhos</h2></div><div class="form-pad">
+        <div class="form2">
+            <div class="field"><label>Fonte do sistema</label>
+                <select asp-for="Item.Fonte" data-pv="fonte">@foreach (var f in PersonalizacaoGeral.FontesPermitidas) {<option value="@f">@f</option>}</select></div>
+            <div class="field"><label>Barra lateral (px)</label><input asp-for="Item.FonteLateralPx" type="number" min="10" max="24" data-pv="lateral"></div>
+        </div>
+    </div></div>
+
+    <div class="card"><div class="card-head"><h2>Imagem de fundo</h2><span class="sub">padrões ou upload</span></div><div class="form-pad">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px" id="bgPatterns">
+            <label class="bgp @(it.FundoPadrao is null ? "on" : "")" title="Usar a cor de fundo" style="background:@it.CorFundo" data-cor="1"><input type="radio" name="Item.FundoPadrao" value="" checked="@(it.FundoPadrao is null)" hidden></label>
+            @foreach (var f in PersonalizacaoGeral.Fundos)
+            {
+                <label class="bgp @(it.FundoPadrao == f.Key ? "on" : "")" style="background:@Html.Raw(f.Value)" data-bg="@f.Value"><input type="radio" name="Item.FundoPadrao" value="@f.Key" checked="@(it.FundoPadrao == f.Key)" hidden></label>
+            }
+        </div>
+        <div class="field" style="margin-top:12px"><label>Enviar imagem de fundo <small class="hint">JPG/PNG · 1920×1080 · até 5 MB (substitui o fundo acima)</small></label><input asp-for="Fundo" type="file" accept=".png,.jpg,.jpeg,.webp,.gif">
+            @if (!string.IsNullOrWhiteSpace(it.FundoUrl)) {<label class="check"><input asp-for="RemoverFundo"> Remover imagem atual (<a href="@it.FundoUrl" target="_blank">ver</a>)</label>}</div>
+    </div></div>
+
+    <div class="card"><div class="card-head"><h2>Logotipo e vídeo</h2></div><div class="form-pad">
+        <div class="field"><label>Logotipo <small class="hint">PNG com fundo transparente · até 5 MB</small></label><input asp-for="Logo" type="file" accept=".png,.jpg,.jpeg,.webp,.gif">
+            @if (!string.IsNullOrWhiteSpace(it.LogoUrl)) {<label class="check"><input asp-for="RemoverLogo"> Remover logotipo atual (<a href="@it.LogoUrl" target="_blank">ver</a>)</label>}</div>
+        <div class="field"><label>Vídeo (link YouTube/Vimeo)</label><input asp-for="Item.MidiaUrl" placeholder="https://youtube.com/watch?v=..."><small class="hint">O vídeo toca sem som e em repetição. O link tem prioridade sobre o arquivo enviado.</small></div>
+        <div class="field"><label>Ou envie um vídeo <small class="hint">MP4/WEBM · até 100 MB</small></label><input asp-for="Video" type="file" accept=".mp4,.webm,.ogg">
+            @if (!string.IsNullOrWhiteSpace(it.VideoUrl)) {<label class="check"><input asp-for="RemoverVideo"> Remover vídeo atual (<a href="@it.VideoUrl" target="_blank">ver</a>)</label>}</div>
+    </div></div>
 </div>
+
 <div class="stack">
-<div class="card"><div class="card-head"><h2>Arquivos</h2></div><div class="form-pad"><div class="field"><label>Logotipo</label><input asp-for="Logo" type="file" accept=".png,.jpg,.jpeg,.webp,.gif"><small class="hint">@Model.Item.LogoUrl</small></div><div class="field"><label>Imagem de fundo</label><input asp-for="Fundo" type="file" accept=".png,.jpg,.jpeg,.webp,.gif"><small class="hint">@Model.Item.FundoUrl</small></div><div class="field"><label>Vídeo / publicidade</label><input asp-for="Video" type="file" accept=".mp4,.webm,.ogg"><small class="hint">@Model.Item.VideoUrl</small></div></div></div>
-<div class="card"><div class="card-head"><h2>Pré-visualização</h2></div><div class="form-pad"><div class="tvmini" style="background:@Model.Item.CorFundo;color:@Model.Item.CorTexto"><div class="bar" style="background:@Model.Item.CorDestaque">@Model.Item.Marca</div><div class="body"><div class="main"><div class="s">A046</div><div class="n">Lucas Ribeiro</div></div><div class="lst"><div><span>A045</span><span>Guichê 2</span></div><div><span>P012</span><span>Guichê 1</span></div></div></div></div></div></div>
-</div></div><div style="margin-top:18px"><button class="btn pri-btn2">Salvar personalização</button></div></form>
+    <div class="card"><div class="card-head"><h2>Pré-visualização da TV</h2><span class="rt"><span class="dot"></span>Ao vivo</span></div><div class="form-pad">
+        <div class="tvmini" id="tvmini" style="background:@Html.Raw(it.FundoCss);color:@it.CorTexto;font-family:'@it.Fonte',sans-serif">
+            <div class="bar" id="pvBar" style="background:linear-gradient(90deg,@it.CorDestaque,@it.CorSecundaria)"><span id="pvMarca">@it.Marca</span><span id="pvHora" style="margin-left:auto"></span></div>
+            <div class="body">
+                <div class="main"><div class="s" id="pvNum" style="color:@it.CorDestaque">A046</div><div class="n" id="pvNome">@(it.NomePublico("Lucas Ribeiro") ?? "")</div><div id="pvSala" style="font-size:11px;background:@it.CorDestaque;padding:2px 10px;border-radius:6px;margin-top:4px;display:inline-block">Guichê 3</div></div>
+                <div class="lst" id="pvOrdem" style="font-size:@(it.FonteLateralPx - 3)px"><div><span>A047</span><span>G1</span></div><div><span>P012</span><span>G2</span></div><div><span>A048</span><span>G4</span></div></div>
+            </div>
+        </div>
+        <p class="hint" style="margin:12px 2px 0">As alterações valem para todas as telas desta filial depois de salvar (as TVs atualizam ao recarregar).</p>
+    </div></div>
+</div>
+</div>
+<div style="margin-top:18px"><button class="btn pri-btn2">Salvar personalização</button></div>
+</form>
+
+@section Scripts {
+<script>
+(() => {
+    const $ = s => document.querySelector(s);
+    const tv = $('#tvmini');
+    const get = k => document.querySelector(`[data-pv="${k}"]`);
+    const fundos = {};
+    let fundoAtual = null;
+
+    function aplicar() {
+        const bg = get('bg').value, tx = get('tx').value, ac = get('ac').value, sec = get('sec').value;
+        document.querySelectorAll('[data-val]').forEach(el => { const i = document.querySelector(`input[name="Item.${el.dataset.val}"]`); if (i) el.textContent = i.value.toUpperCase(); });
+        tv.style.background = fundoAtual || bg;
+        tv.style.color = tx;
+        $('#pvBar').style.background = `linear-gradient(90deg,${ac},${sec})`;
+        $('#pvNum').style.color = ac;
+        $('#pvSala').style.background = ac;
+        $('#pvMarca').textContent = get('marca').value || 'Sua Marca';
+        tv.style.fontFamily = `'${get('fonte').value}',sans-serif`;
+        $('#pvOrdem').style.fontSize = (Math.min(24, Math.max(10, +get('lateral').value || 14)) - 3) + 'px';
+        $('#pvHora').style.visibility = get('hora').checked ? 'visible' : 'hidden';
+        $('#pvNum').style.visibility = get('num').checked ? 'visible' : 'hidden';
+        $('#pvOrdem').style.visibility = get('ordem').checked ? 'visible' : 'hidden';
+        $('#pvSala').style.visibility = get('sala').checked ? 'visible' : 'hidden';
+        $('#pvNome').textContent = { '0': '', '1': 'Lucas R.', '2': 'Lucas Ribeiro' }[get('nome').value] ?? '';
+        const corPadrao = document.querySelector('#bgPatterns [data-cor]'); if (corPadrao) corPadrao.style.background = bg;
+    }
+
+    document.querySelectorAll('#bgPatterns .bgp').forEach(l => {
+        if (l.classList.contains('on') && l.dataset.bg) fundoAtual = l.dataset.bg;
+        l.onclick = () => {
+            document.querySelectorAll('#bgPatterns .bgp').forEach(x => x.classList.remove('on'));
+            l.classList.add('on'); l.querySelector('input').checked = true;
+            fundoAtual = l.dataset.bg || null; aplicar();
+        };
+    });
+    document.querySelectorAll('[data-pv]').forEach(el => el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', aplicar));
+
+    const tick = () => $('#pvHora').textContent = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+    tick(); setInterval(tick, 10000);
+    aplicar();
+})();
+</script>
+}

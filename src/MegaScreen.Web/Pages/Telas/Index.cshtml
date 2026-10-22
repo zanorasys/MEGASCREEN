@@ -1,6 +1,53 @@
 @page
 @model MegaScreen.Web.Pages.Telas.IndexModel
-@{ViewData["Title"]="Telas";}
-<div class="page-head"><div><h2>Gerenciamento de Telas</h2><p>Telas de exibição associadas às salas de espera.</p></div></div>
-<div class="cfg-grid"><div class="card"><div class="card-head"><h2>@(Model.Item.Id==0?"Nova tela":"Editar tela")</h2></div><form method="post" asp-page-handler="Save" class="form-pad"><input asp-for="Item.Id" type="hidden"><div class="form2"><div class="field"><label>Nome</label><input asp-for="Item.Nome"></div><div class="field"><label>Apelido</label><input asp-for="Item.Apelido"></div><div class="field"><label>Tipo</label><select asp-for="Item.Tipo" asp-items="Html.GetEnumSelectList<TipoTela>()"></select></div><div class="field"><label>Sala de espera</label><select asp-for="Item.SalaEsperaId"><option value="">Sem vínculo</option>@foreach(var s in Model.SalasEspera){<option value="@s.Id">@s.Nome</option>}</select></div><div class="field"><label>Prédio</label><input asp-for="Item.Predio"></div><div class="field"><label>Andar</label><input asp-for="Item.Andar"></div><div class="field"><label>Ramal</label><input asp-for="Item.Ramal"></div><div class="field"><label>Cor</label><input asp-for="Item.Cor" type="color"></div></div><label class="check"><input asp-for="Item.Visivel"> Visível</label><div asp-validation-summary="All" class="validation"></div><div style="margin-top:14px"><button class="btn pri-btn2">Salvar</button>@if(Model.Item.Id>0){<a class="btn line" asp-page="./Index">Cancelar</a>}</div></form></div>
-<div class="card"><table><thead><tr><th>ID</th><th>Nome</th><th>Tipo</th><th>Localização</th><th>Sala</th><th>Visível</th><th></th></tr></thead><tbody>@foreach(var t in Model.Itens){<tr><td>#@t.Id.ToString("D2")</td><td class="nm">@t.Nome<br><small>@t.Apelido</small></td><td>@t.Tipo</td><td>@t.Predio · @t.Andar · R.@t.Ramal</td><td>@t.SalaEspera?.Nome</td><td><span class="st @(t.Visivel?"on":"off")">@(t.Visivel?"Visível":"Oculta")</span></td><td><div class="rowacts"><a class="iconbtn" asp-route-edit="@t.Id">✎</a><form method="post" asp-page-handler="Delete" asp-route-id="@t.Id"><button class="iconbtn">×</button></form></div></td></tr>}</tbody></table></div></div>
+@{ ViewData["Title"] = "Telas"; }
+<div class="page-head"><div><h2>Gerenciamento de Telas</h2><p>Telas de exibição associadas às salas de espera. Cada tela tem um link próprio: abra-o no navegador da TV ou do tablet.</p></div></div>
+<div class="cfg-grid">
+<div class="card"><div class="card-head"><h2>@(Model.Item.Id == 0 ? "Nova tela" : "Editar tela")</h2></div>
+<form method="post" asp-page-handler="Save" class="form-pad">
+    <input asp-for="Item.Id" type="hidden">
+    <div class="form2">
+        <div class="field"><label>Nome</label><input asp-for="Item.Nome" placeholder="Ex: Recepção Térreo"></div>
+        <div class="field"><label>Apelido</label><input asp-for="Item.Apelido" placeholder="REC-T"></div>
+        <div class="field"><label>Tipo de tela</label><select asp-for="Item.Tipo" asp-items="Html.GetEnumSelectList<TipoTela>()"></select></div>
+        <div class="field"><label>Sala de espera</label><select asp-for="Item.SalaEsperaId"><option value="">Sem vínculo (filial inteira)</option>@foreach (var s in Model.SalasEspera) {<option value="@s.Id">@s.Nome</option>}</select></div>
+        <div class="field"><label>Prédio</label><input asp-for="Item.Predio" placeholder="A"></div>
+        <div class="field"><label>Andar</label><input asp-for="Item.Andar" placeholder="Térreo"></div>
+        <div class="field"><label>Ramal</label><input asp-for="Item.Ramal" placeholder="201"></div>
+        <div class="field"><label>Cor</label><input asp-for="Item.Cor" type="color"></div>
+    </div>
+    <label class="check"><input asp-for="Item.Visivel"> Visível (desmarcada, a tela mostra "desativada")</label>
+    <div asp-validation-summary="All" class="validation"></div>
+    <div style="margin-top:14px"><button class="btn pri-btn2">Salvar</button>@if (Model.Item.Id > 0) {<a class="btn line" asp-page="./Index">Cancelar</a>}</div>
+</form></div>
+<div class="card"><table>
+<thead><tr><th>ID</th><th>Nome</th><th>Tipo</th><th>Localização</th><th>Sala de espera</th><th>Cor</th><th>Visível</th><th>Link</th><th></th></tr></thead>
+<tbody>
+@foreach (var t in Model.Itens)
+{
+    var tv = t.Tipo == TipoTela.TvHorizontal;
+    var link = tv ? Url.Page("/Public/Tv", null, new { telaId = t.Id }, Request.Scheme) : Url.Page("/Public/Totem", null, new { telaId = t.Id }, Request.Scheme);
+    <tr>
+        <td class="ord">#@t.Id.ToString("D2")</td>
+        <td class="nm">@t.Nome<br><small>@t.Apelido</small></td>
+        <td><span class="badge-type @(tv ? "tv" : "tablet")">@(tv ? "TV Horizontal" : "Tablet Vertical")</span></td>
+        <td>@string.Join(" · ", new[] { string.IsNullOrWhiteSpace(t.Predio) ? null : "Prédio " + t.Predio, t.Andar, string.IsNullOrWhiteSpace(t.Ramal) ? null : "R." + t.Ramal }.Where(x => !string.IsNullOrWhiteSpace(x)))</td>
+        <td>@(t.SalaEspera?.Nome ?? "Filial inteira")</td>
+        <td><span class="swatch" style="background:@t.Cor"></span></td>
+        <td><span class="st @(t.Visivel ? "on" : "off")">@(t.Visivel ? "Visível" : "Oculta")</span></td>
+        <td class="tel-link"><a href="@link" target="_blank">Abrir</a> · <a href="#" data-copy="@link">Copiar</a></td>
+        <td><div class="rowacts"><a class="iconbtn" asp-route-edit="@t.Id" title="Editar">✎</a><form method="post" asp-page-handler="Delete" asp-route-id="@t.Id" onsubmit="return confirm('Excluir esta tela?')"><button class="iconbtn" title="Excluir">×</button></form></div></td>
+    </tr>
+}
+</tbody></table></div>
+</div>
+@section Scripts {
+<script>
+document.querySelectorAll('[data-copy]').forEach(a => a.onclick = async e => {
+    e.preventDefault();
+    try { await navigator.clipboard.writeText(a.dataset.copy); a.textContent = 'Copiado'; }
+    catch { prompt('Copie o link:', a.dataset.copy); }
+    setTimeout(() => a.textContent = 'Copiar', 1500);
+});
+</script>
+}

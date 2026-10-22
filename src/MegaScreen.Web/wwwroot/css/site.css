@@ -434,3 +434,20 @@
   table{display:block;overflow-x:auto;white-space:nowrap}
   .cfg-grid{grid-template-columns:1fr}
 }
+
+/* ===== Fase 2: local atual, sino, pontos ===== */
+.local{position:relative;display:flex;align-items:center;gap:10px}
+.local .chip{border:0;font-family:inherit}
+.local-pop,.bell-pop{display:none;position:absolute;top:calc(100% + 8px);z-index:60;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(15,18,50,.14);padding:14px;min-width:260px}
+.local-pop{left:0}
+.local-pop.open,.bell-pop.open{display:block}
+.local-pop form{display:flex;flex-direction:column;gap:10px}
+.local-pop label{font-size:12px;font-weight:700;color:var(--muted)}
+.local-pop select,.local-pop input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font:inherit}
+.bell-pop{right:0;left:auto;width:300px;max-height:360px;overflow:auto;cursor:default}
+.bell-pop h4{margin:0 0 8px;font-size:13px}
+.bell-pop .bi{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line-2,#eee);font-size:13px}
+.bell-pop .bi b{font-family:"Space Grotesk";min-width:52px}
+.bell-pop .bi span{margin-left:auto;color:var(--accent);font-weight:700}
+.bell-pop .vazio{color:var(--muted);font-size:13px}
+.tel-link{font-size:12px}

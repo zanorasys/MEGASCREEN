@@ -10,12 +10,55 @@
 <div class="grid">
 <div class="stack"><div class="card"><div class="calling" id="calling"></div><div class="qtool"><div class="search"><input id="search" placeholder="Buscar por senha, nome ou modalidade"></div><button class="btn line sm" id="callNext">Chamar próxima</button><button class="btn pri-btn2 sm" id="addBtn">Adicionar manualmente</button></div><table><thead><tr><th>Ordem</th><th>Senha</th><th>Nome</th><th>Modalidade</th><th>Prioridade</th><th>Status</th><th></th></tr></thead><tbody id="queueBody"></tbody></table></div></div>
 <div class="stack"><div class="card"><div class="card-head"><h2>Próximas chamadas</h2><span class="rt"><span class="dot"></span>Ao vivo</span></div><div class="next-list" id="nextList"></div></div>
-<div class="card"><div class="card-head"><h2>Pontos de atendimento</h2><span class="sub">@Model.LocalAtual</span></div><div class="rooms">@foreach(var p in Model.Pontos){<div class="room"><span class="rdot" style="background:@(p.Ativo?"var(--green)":"var(--amber)")"></span><span class="rname">@p.Nome</span><span class="rstate @(p.Ativo?"free":"paused")">@(p.Ativo?"Ativo":"Pausado")</span></div>}</div></div></div>
+<div class="card"><div class="card-head"><h2>Pontos de atendimento</h2><span class="sub">@(Model.SalaDoLocal?.Nome ?? "Todos")</span></div><div class="rooms" id="rooms"></div></div></div>
 </div>
 <div class="overlay" id="overlay"><div class="modal"><div class="mhead"><h3>Adicionar senha manualmente</h3><button class="x" id="modalX" type="button">✕</button></div><div class="mbody"><div class="field"><label>Nome do paciente</label><input id="asNome" placeholder="Nome completo"></div><div class="field"><label>Modalidade</label><select id="asMod">@foreach(var m in Model.Modalidades){<option value="@m.Id">@m.Nome</option>}</select></div><div class="field"><label>Prioridade</label><div class="seg" id="asPri"><button class="on" data-p="1" type="button">Normal</button><button data-p="2" type="button">Idoso</button><button data-p="3" type="button">Prioridade</button></div></div></div><div class="mfoot"><button class="btn line" id="modalCancel" type="button">Cancelar</button><button class="btn pri-btn2" id="modalSave" type="button">Adicionar à fila</button></div></div></div>
 <div class="overlay" id="printOverlay"><div class="modal" style="max-width:360px"><div class="mhead"><h3>Senha gerada</h3><button class="x" id="printX" type="button">✕</button></div><div class="mbody"><div class="cupom-wrap" id="cupomPreview"></div></div><div class="mfoot"><button class="btn line" id="printClose" type="button">Fechar</button><button class="btn pri-btn2" id="printNow" type="button">Imprimir senha</button></div></div></div>
 <div id="cupomPrint"></div>
+@section Topbar{
+<div class="local" id="localWrap">
+    <span class="lb">Local atual</span>
+    <button class="chip" id="localChip" type="button" title="Trocar local atual">@Model.LocalAtual ✎</button>
+    <div class="local-pop" id="localPop">
+        <form method="post" asp-page="/Account/LocalAtual">
+            <label>Onde você está atendendo?</label>
+            <select name="local" id="localSel">
+                @foreach (var se in Model.SalasEspera)
+                {
+                    var pts = Model.Pontos.Where(p => p.SalaEsperaId == se.Id && p.Ativo).ToList();
+                    if (pts.Count == 0) { continue; }
+                    <optgroup label="@se.Nome">
+                        @foreach (var pt in pts) { <option value="@pt.Nome" selected="@(pt.Nome == Model.LocalAtual)">@pt.Nome</option> }
+                    </optgroup>
+                }
+                @if (Model.Salas.Count > 0)
+                {
+                    <optgroup label="Salas (consultórios)">
+                        @foreach (var sa in Model.Salas) { <option value="@sa.Nome" selected="@(sa.Nome == Model.LocalAtual)">@sa.Nome</option> }
+                    </optgroup>
+                }
+                <option value="__outro">Outro…</option>
+            </select>
+            <input name="localOutro" id="localOutro" maxlength="80" placeholder="Digite o local" style="display:none">
+            <button class="btn pri-btn2 sm" type="submit">Definir</button>
+        </form>
+    </div>
+</div>
+}
+@section Bell{
+<div class="ic" id="bell" title="Senhas aguardando há muito tempo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg><span class="badge" id="bellBadge" style="display:none">0</span>
+    <div class="bell-pop" id="bellPop"></div>
+</div>
+}
 @section Scripts{
-<script>window.MEGA={filialId:@Model.FilialId,localAtual:@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.LocalAtual)),fila:@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Fila))};</script>
+<script>window.MEGA={
+    filialId:@Model.FilialId,
+    localAtual:@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.LocalAtual)),
+    filialNome:@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.FilialNome)),
+    marca:@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Personalizacao.Marca)),
+    alertaMin:@Model.Personalizacao.AlertaEsperaMin,
+    pontos:@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PontosDoCard.Select(p => new { nome = p.Nome, ativo = p.Ativo }))),
+    fila:@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Fila))
+};</script>
 <script src="~/js/painel.js" asp-append-version="true"></script>
 }

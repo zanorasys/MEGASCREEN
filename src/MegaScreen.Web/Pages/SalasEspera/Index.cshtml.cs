@@ -16,6 +16,7 @@ public class IndexModel(AppRepository repository) : PageModel
     public List<PontoAtendimento> Pontos { get; private set; } = new();
     public SalaEspera Item { get; set; } = new();
     public PontoAtendimento Ponto { get; set; } = new();
+    public List<Tela> Telas { get; private set; } = new();
 
     public async Task OnGetAsync(int? edit)
     {
@@ -23,10 +24,11 @@ public class IndexModel(AppRepository repository) : PageModel
         ViewData["FilialId"] = fid;
         Itens = await repository.ListarSalasEsperaAsync(fid);
         Pontos = await repository.ListarPontosAsync(fid);
+        Telas = await repository.ListarTelasAsync(fid);
         Item = edit is > 0 ? Itens.FirstOrDefault(x => x.Id == edit) ?? new SalaEspera { FilialId = fid } : new SalaEspera { FilialId = fid };
     }
 
-    public async Task<IActionResult> OnPostSaveAsync([Bind(Prefix = "Item")] SalaEspera item)
+    public async Task<IActionResult> OnPostSaveAsync([Bind(Prefix = "Item")] SalaEspera item, int[]? telaIds)
     {
         item.FilialId = User.FilialId();
         if (!ModelState.IsValid)
@@ -35,7 +37,8 @@ public class IndexModel(AppRepository repository) : PageModel
             Item = item;
             return Page();
         }
-        await repository.SalvarSalaEsperaAsync(item);
+        var id = await repository.SalvarSalaEsperaAsync(item);
+        await repository.AssociarTelasAsync(id, item.FilialId, telaIds ?? []);
         TempData["Toast"] = "Sala de espera salva.";
         return RedirectToPage();
     }
@@ -64,6 +67,13 @@ public class IndexModel(AppRepository repository) : PageModel
             return RedirectToPage();
         }
         TempData["Toast"] = "Ponto de atendimento salvo.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostTogglePontoAsync(int id)
+    {
+        await repository.AlternarPontoAsync(id, User.FilialId());
+        TempData["Toast"] = "Status do ponto atualizado.";
         return RedirectToPage();
     }
 

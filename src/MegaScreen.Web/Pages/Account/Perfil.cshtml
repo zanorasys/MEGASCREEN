@@ -3,7 +3,7 @@
 @{ViewData["Title"]="Meu perfil";}
 <div class="page-head"><div><h2>Meu perfil</h2><p>Dados operacionais e alteração de senha.</p></div></div>
 <div class="card" style="max-width:720px"><form method="post"><div style="padding:20px"><div asp-validation-summary="All"></div><div class="form2">
-<div class="field"><label>Nome</label><input asp-for="Nome"/></div><div class="field"><label>Local atual</label><input asp-for="LocalAtual" placeholder="Recepção I / Guichê 2"/></div>
+<div class="field"><label>Nome</label><input asp-for="Nome"/></div><div class="field"><label>E-mail</label><input value="@Model.Email" readonly/></div><div class="field"><label>Local atual</label><input asp-for="LocalAtual" placeholder="Recepção I / Guichê 2"/></div>
 <div class="field full"><hr style="border:0;border-top:1px solid var(--line);margin:4px 0 12px"/><b>Alterar senha</b><div class="hint">Deixe em branco para manter a senha atual.</div></div>
 <div class="field"><label>Senha atual</label><input asp-for="SenhaAtual" type="password" autocomplete="current-password"/></div><div class="field"><label>Nova senha</label><input asp-for="NovaSenha" type="password" autocomplete="new-password"/></div>
 <div class="field"><label>Confirmar nova senha</label><input asp-for="Confirmacao" type="password" autocomplete="new-password"/></div>

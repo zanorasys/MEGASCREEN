@@ -4,7 +4,7 @@
 <div class="prof active">
     <div class="prof-top">
         <div class="mk"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 3v6M9 6h6"/><rect x="4" y="9" width="16" height="11" rx="2"/></svg></div>
-        <div><h1>Painel do Profissional<small>@User.Identity?.Name</small></h1></div>
+        <div><h1>Painel do Profissional<small>@User.Identity?.Name · <span id="profSalaNome"></span></small></h1></div>
         <div class="spacer" style="margin-left:auto"></div>
         <a class="btn line sm" asp-page="/Painel/Index">Voltar ao backoffice</a>
     </div>
@@ -38,9 +38,10 @@
     const atual=()=>fila.find(q=>q.status==='EmAtendimento'&&(q.ponto||'')===salaNome());
     async function post(url){try{const r=await fetch(url,{method:'POST'});if(r.ok)return;let m='Não foi possível concluir a ação.';try{const j=await r.json();if(j&&j.erro)m=j.erro;}catch{}if(r.status===401)m='Sua sessão expirou. Faça login novamente.';alert(m);}catch{alert('Sem conexão com o servidor.');}}
     function render(){
+        profSalaNome.textContent=salaNome()||'Sem sala';
         const a=atual();
         profSenha.textContent=a?a.codigo:'—'; profNome.textContent=a?(a.nome||'—'):'Nenhum paciente';
-        profTags.innerHTML=a?`<span>${esc(a.modalidade)}</span>${a.prioridade!=='Normal'?`<span class="pri">${a.prioridade}</span>`:''}`:'';
+        profTags.innerHTML=a?`<span>${esc(a.modalidade)}</span>${a.prioridade!=='Normal'?`<span class="pri">${a.prioridade==='Alta'?'Prioridade':esc(a.prioridade)}</span>`:''}`:'';
         const nxt=fila.filter(q=>q.status==='Aguardando').slice(0,4);
         profNext.innerHTML=nxt.length?nxt.map((q,i)=>`<div class="next-item"><div class="o">${String(i+1).padStart(2,'0')}</div><span class="s">${q.codigo}</span><div class="nm2">${esc(q.nome||'—')}<small>${esc(q.modalidade)}</small></div></div>`).join(''):'<div class="next-empty">Fila vazia.</div>';
     }
@@ -51,6 +52,7 @@
     profCall.onclick=chamarProximo; profRecall.onclick=rechamar; profDone.onclick=concluir; profMiss.onclick=naoCompareceu;
     const conn=new signalR.HubConnectionBuilder().withUrl('/hubs/senha').withAutomaticReconnect().build();
     conn.on('FilaAtualizada',f=>{fila=f;render();});
+    conn.onreconnected(async()=>{await conn.invoke('EntrarNaFilial',filialId);try{const r=await fetch('/api/senhas/fila',{cache:'no-store'});if(r.ok){fila=await r.json();render();}}catch{}});
     conn.start().then(()=>conn.invoke('EntrarNaFilial',filialId)).catch(console.error);
     render();
 </script>

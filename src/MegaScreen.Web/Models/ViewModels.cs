@@ -43,3 +43,22 @@ public class SenhaDto
         ChamadaEm = s.ChamadaEm
     };
 }
+
+/// <summary>Chamada exibida na TV pública: sem dados além do necessário (nome conforme regra de LGPD).</summary>
+public class TvChamadaDto
+{
+    [JsonPropertyName("id")] public int Id { get; set; }
+    [JsonPropertyName("codigo")] public string Codigo { get; set; } = "";
+    [JsonPropertyName("nome")] public string? Nome { get; set; }
+    [JsonPropertyName("modalidade")] public string Modalidade { get; set; } = "";
+    [JsonPropertyName("ponto")] public string? Ponto { get; set; }
+}
+
+/// <summary>Indicadores do painel (atualizados ao vivo).</summary>
+public class PainelStatsDto
+{
+    [JsonPropertyName("aguardando")] public int Aguardando { get; set; }
+    [JsonPropertyName("emAtendimento")] public int EmAtendimento { get; set; }
+    [JsonPropertyName("concluidosHoje")] public int ConcluidosHoje { get; set; }
+    [JsonPropertyName("esperaMediaSegundos")] public int EsperaMediaSegundos { get; set; }
+}

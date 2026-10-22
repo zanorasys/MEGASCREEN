@@ -3,7 +3,34 @@
 @{ ViewData["Title"] = "Ajuda"; }
 <div class="page-head"><div><h2>Ajuda / Documentação</h2><p>Orientações para configuração inicial e explicação dos elementos.</p></div></div>
 <div class="acc">
-    <details open><summary>Primeiros passos</summary><div class="accbody">Cadastre as Salas de Espera, associe as Telas (TV/Tablet) e defina as Modalidades. Depois configure os usuários e o Local Atual.</div></details>
-    <details><summary>Telas</summary><div class="accbody">Monitores de exibição: TV (horizontal) ou Tablet (vertical), com prédio, andar, ramal e cor.</div></details>
-    <details><summary>Modalidades e prioridades</summary><div class="accbody">Cada modalidade tem prefixo e prioridade interna. Prioridades gerais: normal, idoso e prioridade.</div></details>
+    <details open><summary>Primeiros passos</summary><div class="accbody">
+        1. Cadastre as <b>Salas de Espera</b> e os <b>guichês</b> (pontos de atendimento) de cada uma.<br>
+        2. Cadastre as <b>Telas</b> (TV ou Tablet) e associe cada uma à sua sala de espera.<br>
+        3. Cadastre as <b>Salas</b> (consultórios) e informe em qual sala de espera o paciente aguarda.<br>
+        4. Defina as <b>Modalidades</b> de atendimento.<br>
+        5. Configure os <b>usuários</b>. No painel, cada atendente escolhe o <b>Local atual</b> (o guichê onde está) no topo da tela.
+    </div></details>
+    <details><summary>Telas (TV e Totem)</summary><div class="accbody">
+        Cada tela tem um link próprio (coluna <b>Link</b> em Telas). Abra o link no navegador da TV ou do tablet em tela cheia (F11).
+        A <b>TV</b> mostra apenas as chamadas dos guichês da sua sala de espera e dos consultórios ligados a ela; sem sala de espera, mostra a filial inteira.
+        O <b>Tablet</b> abre o totem de retirada de senha. Desmarcar <b>Visível</b> desativa a tela.
+    </div></details>
+    <details><summary>Local atual e chamadas</summary><div class="accbody">
+        O local atual define em qual guichê a senha é chamada e qual atendimento aparece em "Em atendimento" para você.
+        Dois atendentes não devem usar o mesmo local ao mesmo tempo. O card <b>Pontos de atendimento</b> mostra quem está livre, ocupado ou pausado.
+    </div></details>
+    <details><summary>Modalidades e prioridades</summary><div class="accbody">
+        Cada modalidade tem um prefixo de senha (ex.: A, P) e uma prioridade interna. A numeração recomeça todo dia.
+        Senhas de idosos e prioritárias (PcD / gestante) passam na frente das normais.
+    </div></details>
+    <details><summary>Personalização</summary><div class="accbody">
+        Ajuste cores, fonte, tamanho da lista lateral, logotipo, imagem ou fundo pronto e vídeo (link do YouTube/Vimeo ou arquivo).
+        É possível exibir ou esconder horário, número da chamada, ordem e sala. Em <b>Nome do paciente na TV</b> você escolhe como o nome aparece (LGPD).
+        O <b>Alerta de espera</b> define a partir de quantos minutos o sino do painel avisa.
+    </div></details>
+    <details><summary>Som da TV e impressão do totem</summary><div class="accbody">
+        Os navegadores só liberam som depois de um clique: ao abrir a TV, clique em <b>Ativar som das chamadas</b>.
+        Para TVs sem teclado/mouse, abra o Chrome com <code>--autoplay-policy=no-user-gesture-required</code>.
+        No totem, para imprimir sem a janela de impressão, use o Chrome em modo quiosque com <code>--kiosk --kiosk-printing</code>.
+    </div></details>
 </div>

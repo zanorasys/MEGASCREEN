@@ -9,6 +9,7 @@
     var filialNome = User.FindFirst("FilialNome")?.Value ?? "Filial";
     var localAtual = User.FindFirst("LocalAtual")?.Value ?? "Recepção I";
     var filiais = perfil == "Admin" ? await Repository.ListarFiliaisAtivasAsync() : new List<MegaScreen.Web.Models.Filial>();
+    var aguardando = User.Identity?.IsAuthenticated == true ? await Repository.ContarAguardandoHojeAsync(filialId) : 0;
 }
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -16,7 +17,7 @@
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Mega Screen — @ViewData["Title"]</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="~/css/site.css" asp-append-version="true"/>
 </head>
 <body>
@@ -28,7 +29,7 @@
 @foreach(var filial in filiais){<form method="post" asp-page="/Account/SwitchFilial" asp-route-filialId="@filial.Id"><button class="@(filial.Id==filialId?"sel":"")" type="submit">@filial.Nome @if(filial.Id==filialId){<span class="chk">✓</span>}</button></form>}
 </div></div>}
 <nav class="nav">
-<div class="nav-label">Operação</div><a class="@Active("/Painel")" asp-page="/Painel/Index">Painel</a><a class="@Active("/Telas")" asp-page="/Telas/Index">Telas</a>
+<div class="nav-label">Operação</div><a class="@Active("/Painel")" asp-page="/Painel/Index">Painel <span class="tag" id="navCount" style="@(aguardando > 0 ? "" : "display:none")">@aguardando</span></a><a class="@Active("/Telas")" asp-page="/Telas/Index">Telas</a>
 <div class="nav-label">Configuração</div><a class="@Active("/SalasEspera")" asp-page="/SalasEspera/Index">Salas de Espera</a><a class="@Active("/Salas")" asp-page="/Salas/Index">Salas</a><a class="@Active("/Modalidades")" asp-page="/Modalidades/Index">Modalidades</a><a class="@Active("/Usuarios")" asp-page="/Usuarios/Index">Usuários</a>
 <div class="nav-label">Sistema</div><a class="@Active("/Personalizacao")" asp-page="/Personalizacao/Index">Personalização</a><a class="@Active("/Ajuda")" asp-page="/Ajuda/Index">Ajuda</a>
 @if(perfil=="Admin"){<div class="nav-label">ADMIN · White Label</div><a class="@Active("/Clientes")" asp-page="/Clientes/Index">Gestão de Clientes</a><a class="@Active("/Filiais")" asp-page="/Filiais/Index">Filiais</a>}
@@ -36,11 +37,11 @@
 <div class="foot"><a class="av" asp-page="/Account/Perfil" title="Meu perfil">@iniciais</a><div><b>@nome</b><small>@perfil · @filialNome</small></div><form asp-page="/Account/Logout" method="post" style="margin-left:auto"><button class="out" type="submit" title="Sair">↪</button></form></div>
 </aside>
 <div class="main">
-<div class="topbar"><button class="burger" type="button" onclick="document.getElementById('side').classList.toggle('open')">☰</button><div class="pagetitle">@ViewData["Title"]<small>@filialNome · @localAtual</small></div><div class="spacer"></div>
+<div class="topbar"><button class="burger" type="button" onclick="document.getElementById('side').classList.toggle('open')">☰</button>@if (IsSectionDefined("Topbar")) { @await RenderSectionAsync("Topbar") } else { <div class="pagetitle">@ViewData["Title"]<small>@filialNome · @localAtual</small></div> }<div class="spacer"></div>
 <a class="btn line sm" asp-page="/Public/Tv" asp-route-filialId="@filialId" target="_blank">Ver painel (TV)</a>
 @if(perfil is "Admin" or "Profissional"){<a class="btn line sm" asp-page="/Public/Profissional" target="_blank">Tela do profissional</a>}
 <a class="btn line sm" asp-page="/Public/Totem" asp-route-filialId="@filialId" target="_blank">Totem</a>
-<div class="clock"><span class="t" id="clock">--:--</span><span class="d" id="today"></span></div></div>
+<div class="clock"><span class="t" id="clock">--:--</span><span class="d" id="today"></span></div>@await RenderSectionAsync("Bell", required:false)</div>
 <main class="content"><div class="toasts" id="toasts"></div>@if(TempData["Toast"] is string toast){<div class="alert-ok">@toast</div>}@RenderBody()</main>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>

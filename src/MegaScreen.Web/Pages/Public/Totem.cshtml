@@ -1,10 +1,95 @@
 @page
 @model MegaScreen.Web.Pages.Public.TotemModel
-@{Layout="_LayoutPublic";ViewData["Title"]="Totem";var p=Model.Personalizacao;}
-<style>.totem{background:@p.CorFundo;color:@p.CorTexto;font-family:"@p.Fonte",sans-serif}.tbtn .ti{background:@p.CorDestaque}</style>
-<div class="totem active"><div class="thead"><div class="mk">@if(!string.IsNullOrWhiteSpace(p.LogoUrl)){<img src="@p.LogoUrl" style="max-width:100%;max-height:100%">}</div><h1>@p.Marca</h1><p>@(Model.Filial?.Nome??"Filial") · toque para retirar sua senha</p></div>
-<div class="tstep" id="tstep1"><div class="tstep-title">Toque no atendimento desejado</div><div class="tgrid">@foreach(var m in Model.Modalidades){<button class="tbtn" data-mod="@m.Id">@m.Nome</button>}</div></div>
-<div class="tstep" id="tstep2" style="display:none"><div class="tstep-title">Você possui atendimento prioritário?</div><div class="tgrid"><button class="tbtn" data-pri="1">Senha normal</button><button class="tbtn pri" data-pri="2">Idoso</button><button class="tbtn pri" data-pri="3">Prioridade (PcD / gestante)</button></div><button class="tback" id="totemBack">Voltar</button></div>
-<div class="tstep" id="tstep3" style="display:none"><div class="totem-done"><div class="ok">✓</div><div class="tstep-title" style="margin:0">Sua senha</div><div class="tsenha" id="totemSenha">—</div><div class="tmsg" id="totemMsg"></div><div class="tprint">Imprimindo comprovante…</div></div></div></div>
-@section Scripts{<script>
-const filialId=@Model.FilialId;let mod=null;const marca=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.Marca));function go(n){[1,2,3].forEach(i=>document.getElementById('tstep'+i).style.display=i===n?'':'none')}document.querySelectorAll('#tstep1 .tbtn').forEach(b=>b.onclick=()=>{mod=+b.dataset.mod;go(2)});document.getElementById('totemBack').onclick=()=>go(1);document.querySelectorAll('#tstep2 .tbtn').forEach(b=>b.onclick=async()=>{const r=await fetch(`/api/senhas/emitir/${filialId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:null,modalidadeId:mod,prioridade:+b.dataset.pri})});if(!r.ok){let m='Não foi possível gerar a senha. Procure a recepção.';try{const j=await r.json();if(j&&j.erro)m=j.erro;}catch{}if(r.status===429)m='Muitas solicitações. Aguarde um instante.';alert(m);return;}const dto=await r.json();totemSenha.textContent=dto.codigo;totemMsg.textContent=dto.modalidade+(dto.prioridade!=='Normal'?' · '+dto.prioridade:'');const mm=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(dto.criadaEm||''),dt=mm?`${mm[3]}/${mm[2]}/${mm[1]} ${mm[4]}:${mm[5]}`:'';document.getElementById('cupomPrint').innerHTML=`<div class="cupom"><div class="ctop"><div class="un">${marca}</div></div><div class="cmod">${dto.modalidade}</div><div class="cnum">${dto.codigo}</div><div class="cpri"><span>${dto.prioridade==='Normal'?'Senha normal':dto.prioridade}</span></div><div class="cinfo"><div><span>Emitida em</span><b>${dt}</b></div></div><div class="cfoot">Aguarde ser chamado.<br>Mega Screen</div></div>`;go(3);setTimeout(()=>window.print(),500);setTimeout(()=>go(1),6000)});</script>}
+@{
+    Layout = "_LayoutPublic";
+    ViewData["Title"] = "Totem";
+    var p = Model.Personalizacao;
+}
+@await Html.PartialAsync("_TemaPublico", p)
+
+@if (Model.Oculta)
+{
+    <div class="totem active"><div class="tv-off">Este totem está desativado.</div></div>
+}
+else
+{
+<div class="totem active">
+    <div class="thead">
+        <div class="mk">@if (!string.IsNullOrWhiteSpace(p.LogoUrl)) {<img src="@p.LogoUrl" alt="Logo" style="max-width:100%;max-height:100%">}</div>
+        <h1>@p.Marca</h1>
+        <p>@Model.Subtitulo · toque para retirar sua senha</p>
+    </div>
+    <div class="tstep" id="tstep1">
+        <div class="tstep-title">Toque no atendimento desejado</div>
+        <div class="tgrid">@foreach (var m in Model.Modalidades) {<button class="tbtn" type="button" data-mod="@m.Id"><span class="ti"></span>@m.Nome</button>}</div>
+    </div>
+    <div class="tstep" id="tstep2" style="display:none">
+        <div class="tstep-title">Você possui atendimento prioritário?</div>
+        <div class="tgrid">
+            <button class="tbtn" type="button" data-pri="1"><span class="ti"></span>Senha normal</button>
+            <button class="tbtn pri" type="button" data-pri="2"><span class="ti"></span>Idoso</button>
+            <button class="tbtn pri" type="button" data-pri="3"><span class="ti"></span>Prioridade (PcD / gestante)</button>
+        </div>
+        <button class="tback" id="totemBack" type="button">Voltar</button>
+    </div>
+    <div class="tstep" id="tstep3" style="display:none">
+        <div class="totem-done">
+            <div class="ok">✓</div>
+            <div class="tstep-title" style="margin:0">Sua senha</div>
+            <div class="tsenha" id="totemSenha">—</div>
+            <div class="tmsg" id="totemMsg"></div>
+            <div class="tprint">Imprimindo comprovante…</div>
+        </div>
+    </div>
+</div>
+}
+
+@section Scripts {
+@if (!Model.Oculta)
+{
+<script>
+(() => {
+    const filialId = @Model.FilialId;
+    const marca = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.Marca));
+    const local = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Subtitulo));
+    const esc = s => (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const $ = id => document.getElementById(id);
+    let mod = null, ocupado = false;
+    const rotulo = p => p === 'Alta' ? 'Prioridade' : p;
+    const go = n => [1, 2, 3].forEach(i => $('tstep' + i).style.display = i === n ? '' : 'none');
+    // Data/hora vem do servidor (São Paulo): "2026-10-22T11:05:33" -> "22/10/2026 11:05"
+    const dataBr = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || ''); return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}` : ''; };
+
+    document.querySelectorAll('#tstep1 .tbtn').forEach(b => b.onclick = () => { mod = +b.dataset.mod; go(2); });
+    $('totemBack').onclick = () => go(1);
+    document.querySelectorAll('#tstep2 .tbtn').forEach(b => b.onclick = async () => {
+        if (ocupado) return; ocupado = true;
+        try {
+            const r = await fetch(`/api/senhas/emitir/${filialId}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome: null, modalidadeId: mod, prioridade: +b.dataset.pri })
+            });
+            if (!r.ok) {
+                let m = 'Não foi possível gerar a senha. Procure a recepção.';
+                try { const j = await r.json(); if (j && j.erro) m = j.erro; } catch { }
+                if (r.status === 429) m = 'Muitas solicitações. Aguarde um instante.';
+                alert(m); go(1); return;
+            }
+            const dto = await r.json();
+            $('totemSenha').textContent = dto.codigo;
+            $('totemMsg').textContent = dto.modalidade + (dto.prioridade !== 'Normal' ? ' · ' + rotulo(dto.prioridade) : '');
+            $('cupomPrint').innerHTML = `<div class="cupom"><div class="ctop"><div class="un">${esc(marca)}</div><div class="lo">${esc(local)}</div></div>
+                <div class="cmod">${esc(dto.modalidade)}</div><div class="cnum">${esc(dto.codigo)}</div>
+                <div class="cpri"><span class="${dto.prioridade === 'Alta' ? 'p-alta' : ''}">${dto.prioridade === 'Normal' ? 'Senha normal' : esc(rotulo(dto.prioridade))}</span></div>
+                <div class="cinfo"><div><span>Emitida em</span><b>${dataBr(dto.criadaEm)}</b></div></div>
+                <div class="cfoot">Aguarde ser chamado no painel.<br>${esc(marca)}</div></div>`;
+            go(3);
+            setTimeout(() => window.print(), 500);
+            setTimeout(() => go(1), 6000);
+        } catch { alert('Sem conexão com o servidor.'); go(1); }
+        finally { setTimeout(() => ocupado = false, 1500); }
+    });
+})();
+</script>
+}
+}

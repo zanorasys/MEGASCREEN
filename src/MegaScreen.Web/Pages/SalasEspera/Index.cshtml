@@ -1,13 +1,61 @@
 @page
 @model MegaScreen.Web.Pages.SalasEspera.IndexModel
-@{ViewData["Title"]="Salas de Espera";}
-<div class="page-head"><div><h2>Salas de Espera &amp; Pontos de Atendimento</h2><p>Ambientes de espera e os guichês vinculados a cada um.</p></div></div>
+@{ ViewData["Title"] = "Salas de Espera"; }
+<div class="page-head"><div><h2>Salas de Espera &amp; Pontos de Atendimento</h2><p>Ambientes de espera, as telas que ficam neles e os guichês vinculados a cada um.</p></div></div>
 <div class="cfg-grid">
 <div class="stack">
-<div class="card"><div class="card-head"><h2>@(Model.Item.Id==0?"Nova sala de espera":"Editar sala de espera")</h2></div><form method="post" asp-page-handler="Save" class="form-pad"><input asp-for="Item.Id" type="hidden"><div class="form2"><div class="field"><label>Nome</label><input asp-for="Item.Nome"></div><div class="field"><label>Apelido</label><input asp-for="Item.Apelido"></div></div><div asp-validation-summary="All" class="validation"></div><button class="btn pri-btn2">Salvar</button>@if(Model.Item.Id>0){<a class="btn line" asp-page="./Index">Cancelar</a>}</form></div>
-<div class="card"><div class="card-head"><h2>Novo ponto de atendimento</h2></div><form method="post" asp-page-handler="SavePonto" class="form-pad"><div class="field"><label>Sala de espera</label><select asp-for="Ponto.SalaEsperaId"><option value="">Selecione</option>@foreach(var s in Model.Itens){<option value="@s.Id">@s.Nome</option>}</select></div><div class="field"><label>Nome do guichê/ponto</label><input asp-for="Ponto.Nome" placeholder="Guichê 1"></div><label class="check"><input asp-for="Ponto.Ativo" checked> Ativo</label><div style="margin-top:14px"><button class="btn pri-btn2">Adicionar ponto</button></div></form></div>
+    <div class="card"><div class="card-head"><h2>@(Model.Item.Id == 0 ? "Nova sala de espera" : "Editar sala de espera")</h2></div>
+    <form method="post" asp-page-handler="Save" class="form-pad">
+        <input asp-for="Item.Id" type="hidden">
+        <div class="form2">
+            <div class="field"><label>Nome</label><input asp-for="Item.Nome"></div>
+            <div class="field"><label>Apelido</label><input asp-for="Item.Apelido"></div>
+        </div>
+        <div class="field"><label>Telas associadas</label>
+            @if (Model.Telas.Count == 0) { <small class="hint">Nenhuma tela cadastrada. Cadastre em Telas.</small> }
+            @foreach (var t in Model.Telas)
+            {
+                var marcada = Model.Item.Id > 0 && t.SalaEsperaId == Model.Item.Id;
+                var outra = t.SalaEsperaId is not null && t.SalaEsperaId != Model.Item.Id ? t.SalaEspera?.Nome : null;
+                <label class="check"><input type="checkbox" name="telaIds" value="@t.Id" checked="@marcada"> @t.Nome @if (outra is not null) {<small class="hint">(hoje em @outra)</small>}</label>
+            }
+        </div>
+        <div asp-validation-summary="All" class="validation"></div>
+        <button class="btn pri-btn2">Salvar</button>@if (Model.Item.Id > 0) {<a class="btn line" asp-page="./Index">Cancelar</a>}
+    </form></div>
+
+    <div class="card"><div class="card-head"><h2>Novo ponto de atendimento</h2></div>
+    <form method="post" asp-page-handler="SavePonto" class="form-pad">
+        <div class="field"><label>Sala de espera</label><select name="Ponto.SalaEsperaId"><option value="0">Selecione</option>@foreach (var s in Model.Itens) {<option value="@s.Id">@s.Nome</option>}</select></div>
+        <div class="field"><label>Nome do guichê/ponto</label><input name="Ponto.Nome" maxlength="80" placeholder="Guichê 1"></div>
+        <label class="check"><input type="checkbox" name="Ponto.Ativo" value="true" checked> Ativo</label><input type="hidden" name="Ponto.Ativo" value="false">
+        <div style="margin-top:14px"><button class="btn pri-btn2">Adicionar ponto</button></div>
+    </form></div>
 </div>
 <div class="stack">
-<div class="card"><table><thead><tr><th>Nome</th><th>Apelido</th><th>Telas</th><th>Guichês</th><th></th></tr></thead><tbody>@foreach(var s in Model.Itens){<tr><td class="nm">@s.Nome</td><td>@s.Apelido</td><td>@s.Telas.Count</td><td>@s.Pontos.Count</td><td><div class="rowacts"><a class="iconbtn" asp-route-edit="@s.Id">✎</a><form method="post" asp-page-handler="Delete" asp-route-id="@s.Id"><button class="iconbtn">×</button></form></div></td></tr>}</tbody></table></div>
-<div class="card"><div class="card-head"><h2>Pontos cadastrados</h2></div><div class="rooms">@foreach(var p in Model.Pontos){var sala=Model.Itens.FirstOrDefault(x=>x.Id==p.SalaEsperaId);<div class="room"><span class="rdot" style="background:@(p.Ativo?"var(--green)":"var(--amber)")"></span><span class="rname">@p.Nome <small>· @sala?.Nome</small></span><span class="rstate @(p.Ativo?"free":"paused")">@(p.Ativo?"Ativo":"Pausado")</span><form method="post" asp-page-handler="DeletePonto" asp-route-id="@p.Id"><button class="iconbtn">×</button></form></div>}</div></div>
+    <div class="card"><div class="card-head"><h2>Salas de espera</h2></div><table><thead><tr><th>Nome</th><th>Apelido</th><th>Telas</th><th>Guichês</th><th></th></tr></thead><tbody>
+    @foreach (var s in Model.Itens)
+    {
+        <tr><td class="nm">@s.Nome</td><td>@s.Apelido</td><td>@s.Telas.Count</td><td>@s.Pontos.Count</td>
+        <td><div class="rowacts"><a class="iconbtn" asp-route-edit="@s.Id" title="Editar">✎</a><form method="post" asp-page-handler="Delete" asp-route-id="@s.Id" onsubmit="return confirm('Excluir a sala de espera e seus guichês?')"><button class="iconbtn" title="Excluir">×</button></form></div></td></tr>
+    }
+    </tbody></table></div>
+
+    @foreach (var s in Model.Itens)
+    {
+        var pts = Model.Pontos.Where(p => p.SalaEsperaId == s.Id).ToList();
+        <div class="card"><div class="card-head"><h2>Pontos de atendimento (guichês)</h2><span class="sub">@s.Nome</span></div><div class="rooms">
+        @if (pts.Count == 0) { <div class="next-empty">Nenhum guichê nesta sala.</div> }
+        @foreach (var p in pts)
+        {
+            <div class="room">
+                <span class="rdot" style="background:@(p.Ativo ? "var(--green)" : "var(--amber)")"></span>
+                <span class="rname">@p.Nome</span>
+                <span class="rstate @(p.Ativo ? "free" : "paused")">@(p.Ativo ? "Ativo" : "Pausado")</span>
+                <form method="post" asp-page-handler="TogglePonto" asp-route-id="@p.Id"><button class="iconbtn" title="@(p.Ativo ? "Pausar" : "Reativar")">@(p.Ativo ? "❚❚" : "▶")</button></form>
+                <form method="post" asp-page-handler="DeletePonto" asp-route-id="@p.Id" onsubmit="return confirm('Excluir este guichê?')"><button class="iconbtn" title="Excluir">×</button></form>
+            </div>
+        }
+        </div></div>
+    }
 </div></div>

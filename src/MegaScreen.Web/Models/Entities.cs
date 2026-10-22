@@ -3,11 +3,13 @@ using MegaScreen.Web.Infrastructure;
 
 namespace MegaScreen.Web.Models;
 
-public enum TipoCliente { PJ = 1, PF = 2 }
+public enum TipoCliente { [Display(Name = "Pessoa Jurídica")] PJ = 1, [Display(Name = "Pessoa Física")] PF = 2 }
 public enum PerfilUsuario { Admin = 1, Atendente = 2, Profissional = 3 }
-public enum TipoTela { TvHorizontal = 1, TabletVertical = 2 }
-public enum Prioridade { Normal = 1, Idoso = 2, Alta = 3 }
+public enum TipoTela { [Display(Name = "TV (horizontal)")] TvHorizontal = 1, [Display(Name = "Tablet / Totem (vertical)")] TabletVertical = 2 }
+public enum Prioridade { Normal = 1, Idoso = 2, [Display(Name = "Alta (PcD / gestante)")] Alta = 3 }
 public enum StatusSenha { Aguardando = 1, EmAtendimento = 2, Concluida = 3, NaoCompareceu = 4, Cancelada = 5 }
+public enum NomeNaTv { Ocultar = 0, PrimeiroNomeInicial = 1, Completo = 2 }
+public enum AvisoChamada { Nenhum = 0, Som = 1, SomEVoz = 2 }
 
 public class Cliente
 {
@@ -16,6 +18,8 @@ public class Cliente
     public TipoCliente Tipo { get; set; } = TipoCliente.PJ;
     [Display(Name = "CNPJ / CPF"), StringLength(20)] public string? Documento { get; set; }
     public bool Ativo { get; set; } = true;
+    /// <summary>Senhas emitidas no mês corrente (todas as filiais). Calculado, não é coluna.</summary>
+    public int SenhasMes { get; set; }
     public ICollection<Filial> Filiais { get; set; } = new List<Filial>();
 }
 
@@ -92,6 +96,8 @@ public class Sala
     [StringLength(60)] public string? Andar { get; set; }
     [StringLength(20)] public string? Ramal { get; set; }
     [StringLength(9)] public string? Cor { get; set; } = "#4C5BF5";
+    /// <summary>Sala de espera onde o paciente aguarda esta sala (define em qual TV a chamada aparece). Nulo = todas.</summary>
+    [Display(Name = "Sala de espera")] public int? SalaEsperaId { get; set; }
 }
 
 public class Modalidade
@@ -129,6 +135,7 @@ public class PersonalizacaoGeral
     [StringLength(9)] public string CorFundo { get; set; } = "#0B0D24";
     [StringLength(9)] public string CorTexto { get; set; } = "#FFFFFF";
     [StringLength(9)] public string CorDestaque { get; set; } = "#4C5BF5";
+    [StringLength(9)] public string CorSecundaria { get; set; } = "#7C5CFC";
     [StringLength(100)] public string Fonte { get; set; } = "Manrope";
     public bool MostrarHorario { get; set; } = true;
     public bool MostrarNumero { get; set; } = true;
@@ -138,6 +145,43 @@ public class PersonalizacaoGeral
     [StringLength(300)] public string? FundoUrl { get; set; }
     [StringLength(300)] public string? VideoUrl { get; set; }
     [StringLength(80)] public string Marca { get; set; } = "Sua Marca";
+    /// <summary>Link do YouTube/Vimeo (coluna MidiaUrl). Tem prioridade sobre o vídeo enviado.</summary>
+    [Display(Name = "Link do vídeo"), StringLength(500)] public string? MidiaUrl { get; set; }
+    [Display(Name = "Barra lateral (px)"), Range(10, 24)] public int FonteLateralPx { get; set; } = 14;
+    [StringLength(20)] public string? FundoPadrao { get; set; }
+    public NomeNaTv NomeNaTv { get; set; } = NomeNaTv.PrimeiroNomeInicial;
+    public AvisoChamada AvisoChamada { get; set; } = AvisoChamada.Som;
+    [Display(Name = "Alerta de espera (min)"), Range(0, 240)] public int AlertaEsperaMin { get; set; } = 15;
+
+    /// <summary>Fundos prontos (chave gravada no banco -> CSS). Só chaves conhecidas viram CSS.</summary>
+    public static readonly IReadOnlyDictionary<string, string> Fundos = new Dictionary<string, string>
+    {
+        ["grad1"] = "linear-gradient(120deg,#0b0d24,#242651)",
+        ["grad2"] = "#0b0d24",
+        ["grad3"] = "linear-gradient(120deg,#12132b,#3b2e6e)",
+        ["grad4"] = "linear-gradient(120deg,#0e2a2a,#0b0d24)"
+    };
+
+    public static readonly string[] FontesPermitidas = ["Manrope", "Inter", "Roboto", "Space Grotesk", "Arial", "Verdana"];
+
+    /// <summary>CSS de fundo da TV: fundo pronto escolhido ou a cor de fundo.</summary>
+    public string FundoCss => FundoPadrao is not null && Fundos.TryGetValue(FundoPadrao, out var css) ? css : CorFundo;
+
+    /// <summary>URL de embed do YouTube/Vimeo (mudo, autoplay, loop) ou null se o link não for reconhecido.</summary>
+    public string? VideoEmbedUrl => VideoLink.Embed(MidiaUrl);
+
+    /// <summary>Formata o nome do paciente para exibição pública conforme a regra de LGPD escolhida.</summary>
+    public string? NomePublico(string? nome)
+    {
+        if (string.IsNullOrWhiteSpace(nome)) return null;
+        var partes = nome.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return NomeNaTv switch
+        {
+            NomeNaTv.Ocultar => null,
+            NomeNaTv.Completo => nome.Trim(),
+            _ => partes.Length > 1 ? $"{partes[0]} {char.ToUpperInvariant(partes[^1][0])}." : partes[0]
+        };
+    }
 }
 
 public class DashboardStats
