@@ -1,17 +1,14 @@
 @page
 @model MegaScreen.Web.Pages.Personalizacao.IndexModel
-@{ ViewData["Title"] = "Personalização"; }
-<div class="page-head"><div><h2>Personalização (Aparência)</h2><p>Cores, fontes, imagem de fundo, logotipo e vídeo das telas públicas.</p></div><div class="spacer"></div><button class="btn pri-btn2">Salvar</button></div>
+@{ViewData["Title"]="Personalização";}
+<div class="page-head"><div><h2>Personalização (Aparência)</h2><p>Ajuste a identidade visual das telas públicas, como no protótipo.</p></div></div>
+<form method="post" enctype="multipart/form-data">
 <div class="cfg-grid">
-    <div class="card"><div class="card-head"><h2>Cores</h2></div><div style="padding:6px 16px 14px">
-        <div class="colorline"><span class="cn">Cor de fundo</span><input type="color" value="#0b0d24"></div>
-        <div class="colorline"><span class="cn">Cor do texto</span><input type="color" value="#ffffff"></div>
-        <div class="colorline"><span class="cn">Cor de destaque</span><input type="color" value="#4c5bf5"></div>
-    </div></div>
-    <div class="card"><div class="card-head"><h2>Exibição</h2></div><div style="padding:4px 16px 12px">
-        <div class="toggle-row"><div class="tx">Mostrar horário</div><div class="sw"><input type="checkbox" id="t1" checked><label for="t1"></label></div></div>
-        <div class="toggle-row"><div class="tx">Número da chamada</div><div class="sw"><input type="checkbox" id="t2" checked><label for="t2"></label></div></div>
-        <div class="toggle-row"><div class="tx">Ordem de chamada</div><div class="sw"><input type="checkbox" id="t3" checked><label for="t3"></label></div></div>
-        <div class="toggle-row"><div class="tx">Sala / guichê</div><div class="sw"><input type="checkbox" id="t4" checked><label for="t4"></label></div></div>
-    </div></div>
+<div class="stack">
+<div class="card"><div class="card-head"><h2>Marca e cores</h2></div><div class="form-pad"><div class="field"><label>Nome da marca</label><input asp-for="Item.Marca"></div><div class="colorline"><span class="cn">Cor de fundo</span><span class="val">@Model.Item.CorFundo</span><input asp-for="Item.CorFundo" type="color"></div><div class="colorline"><span class="cn">Cor do texto</span><span class="val">@Model.Item.CorTexto</span><input asp-for="Item.CorTexto" type="color"></div><div class="colorline"><span class="cn">Cor de destaque</span><span class="val">@Model.Item.CorDestaque</span><input asp-for="Item.CorDestaque" type="color"></div><div class="field"><label>Fonte</label><select asp-for="Item.Fonte"><option>Manrope</option><option>Space Grotesk</option><option>Arial</option><option>Verdana</option></select></div></div></div>
+<div class="card"><div class="card-head"><h2>Exibição</h2></div><div class="form-pad"><div class="toggle-row"><div class="tx">Mostrar horário<small>Relógio no topo do painel</small></div><div class="sw"><input asp-for="Item.MostrarHorario"><label asp-for="Item.MostrarHorario"></label></div></div><div class="toggle-row"><div class="tx">Número da chamada<small>Senha em destaque</small></div><div class="sw"><input asp-for="Item.MostrarNumero"><label asp-for="Item.MostrarNumero"></label></div></div><div class="toggle-row"><div class="tx">Ordem de chamada<small>Lista lateral</small></div><div class="sw"><input asp-for="Item.MostrarOrdem"><label asp-for="Item.MostrarOrdem"></label></div></div><div class="toggle-row"><div class="tx">Sala / guichê<small>Destino do atendimento</small></div><div class="sw"><input asp-for="Item.MostrarSala"><label asp-for="Item.MostrarSala"></label></div></div></div></div>
 </div>
+<div class="stack">
+<div class="card"><div class="card-head"><h2>Arquivos</h2></div><div class="form-pad"><div class="field"><label>Logotipo</label><input asp-for="Logo" type="file" accept="image/*"><small class="hint">@Model.Item.LogoUrl</small></div><div class="field"><label>Imagem de fundo</label><input asp-for="Fundo" type="file" accept="image/*"><small class="hint">@Model.Item.FundoUrl</small></div><div class="field"><label>Vídeo / publicidade</label><input asp-for="Video" type="file" accept="video/*"><small class="hint">@Model.Item.VideoUrl</small></div></div></div>
+<div class="card"><div class="card-head"><h2>Pré-visualização</h2></div><div class="form-pad"><div class="tvmini" style="background:@Model.Item.CorFundo;color:@Model.Item.CorTexto"><div class="bar" style="background:@Model.Item.CorDestaque">@Model.Item.Marca</div><div class="body"><div class="main"><div class="s">A046</div><div class="n">Lucas Ribeiro</div></div><div class="lst"><div><span>A045</span><span>Guichê 2</span></div><div><span>P012</span><span>Guichê 1</span></div></div></div></div></div></div>
+</div></div><div style="margin-top:18px"><button class="btn pri-btn2">Salvar personalização</button></div></form>

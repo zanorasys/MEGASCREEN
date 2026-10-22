@@ -153,6 +153,29 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
         await Broadcast(filialId.Value);
     }
 
+
+    public async Task RechamarAsync(int senhaId)
+    {
+        using var db = connectionFactory.CreateConnection();
+        var senha = await ObterComModalidadeAsync(db, senhaId)
+            ?? throw new InvalidOperationException("Senha não encontrada.");
+        await db.ExecuteAsync("UPDATE Senhas SET ChamadaEm=@agora WHERE Id=@senhaId;", new { senhaId, agora = DateTime.Now });
+        await hub.Clients.Group(Grupo(senha.FilialId)).SendAsync("SenhaChamada", SenhaDto.From(senha));
+        await Broadcast(senha.FilialId);
+    }
+
+    public async Task MoverAsync(int senhaId, string destino)
+    {
+        using var db = connectionFactory.CreateConnection();
+        const string sql = """
+            UPDATE Senhas SET LocalAtual=@destino, PontoAtendimento=@destino
+            OUTPUT INSERTED.FilialId WHERE Id=@senhaId;
+            """;
+        var filialId = await db.QuerySingleOrDefaultAsync<int?>(sql, new { senhaId, destino });
+        if (filialId is null) throw new InvalidOperationException("Senha não encontrada.");
+        await Broadcast(filialId.Value);
+    }
+
     private static async Task<Senha?> ObterComModalidadeAsync(System.Data.IDbConnection db, int senhaId)
     {
         const string sql = """

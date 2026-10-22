@@ -1,33 +1,13 @@
 @page
 @model MegaScreen.Web.Pages.Public.TvModel
-@{ Layout = "_LayoutPublic"; ViewData["Title"] = "Painel TV"; }
-<div class="public active">
-    <div class="tv-top">
-        <div class="mk"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M9 20h6M8 16v4M16 16v4"/></svg></div>
-        <div><h1>Sua Marca</h1><small>Recepção I</small></div>
-        <div class="tvclock"><div class="t" id="tvClock">--:--</div><div class="d" id="tvToday"></div></div>
-    </div>
-    <div class="tv-body">
-        <div class="tv-current" id="tvCurrent"><div class="lbl">Senha</div><div class="senha" id="tvSenha">—</div><div class="nm" id="tvNome">Aguardando</div><div class="sala" id="tvSala"></div></div>
-        <div class="tv-side"><div class="sh">Últimas chamadas</div><div class="list" id="tvList"></div><div class="tv-media">Área de vídeo / publicidade</div></div>
-    </div>
-</div>
-@section Scripts {
-<script>
-    const filialId = @Model.FilialId;
-    let fila = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Fila));
-    const esc = s => (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    function render(){
-        const a = fila.find(q=>q.status==='EmAtendimento');
-        tvSenha.textContent=a?a.codigo:'—'; tvNome.textContent=a?(a.nome||'—'):'Aguardando'; tvSala.textContent=a?(a.ponto||''):'';
-        tvList.innerHTML=fila.slice(0,4).map(q=>`<div class="tv-row"><div class="s">${q.codigo}</div><div class="nn">${esc(q.nome||'—')}<small>${esc(q.modalidade)}</small></div><div class="sl">${esc(q.ponto||'')}</div></div>`).join('');
-    }
-    function tick(){ const d=new Date(); tvClock.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); tvToday.textContent=d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}); }
-    tick(); setInterval(tick,10000);
-    const conn=new signalR.HubConnectionBuilder().withUrl('/hubs/senha').withAutomaticReconnect().build();
-    conn.on('FilaAtualizada',f=>{fila=f;render();});
-    conn.on('SenhaChamada',()=>{tvCurrent.classList.remove('flash');void tvCurrent.offsetWidth;tvCurrent.classList.add('flash');});
-    conn.start().then(()=>conn.invoke('EntrarNaFilial',filialId)).catch(console.error);
-    render();
-</script>
-}
+@{Layout="_LayoutPublic";ViewData["Title"]="Painel TV";var p=Model.Personalizacao;}
+<style>:root{--tvbg:@p.CorFundo;--tvtext:@p.CorTexto;--tvaccent:@p.CorDestaque}.public{background:var(--tvbg);color:var(--tvtext);font-family:"@p.Fonte",sans-serif}.tv-top{background:linear-gradient(90deg,var(--tvaccent),#7C5CFC)}.tv-current .senha{-webkit-text-fill-color:var(--tvtext)}@if(!string.IsNullOrWhiteSpace(p.FundoUrl)){<text>.public{background-image:linear-gradient(rgba(11,13,36,.55),rgba(11,13,36,.55)),url('@p.FundoUrl');background-size:cover;background-position:center}</text>}</style>
+<div class="public active"><div class="tv-top"><div class="mk">@if(!string.IsNullOrWhiteSpace(p.LogoUrl)){<img src="@p.LogoUrl" alt="Logo" style="max-width:100%;max-height:100%">}</div><div><h1>@p.Marca</h1><small>@(Model.Filial?.Nome??"Filial")</small></div>@if(p.MostrarHorario){<div class="tvclock"><div class="t" id="tvClock">--:--</div><div class="d" id="tvToday"></div></div>}</div>
+<div class="tv-body"><div class="tv-current" id="tvCurrent"><div class="lbl">Senha</div>@if(p.MostrarNumero){<div class="senha" id="tvSenha">—</div>}else{<div id="tvSenha" style="display:none"></div>}<div class="nm" id="tvNome">Aguardando</div>@if(p.MostrarSala){<div class="sala" id="tvSala"></div>}else{<div id="tvSala" style="display:none"></div>}</div>
+<div class="tv-side" style="@(p.MostrarOrdem?"":"display:none")"><div class="sh">Últimas chamadas</div><div class="list" id="tvList"></div><div class="tv-media">@if(!string.IsNullOrWhiteSpace(p.VideoUrl)){<video src="@p.VideoUrl" autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover"></video>}else{<span>Área de vídeo / publicidade</span>}</div></div></div></div>
+@section Scripts{<script>
+const filialId=@Model.FilialId;let fila=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Fila));const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function render(){const a=fila.find(q=>q.status==='EmAtendimento');document.getElementById('tvSenha').textContent=a?a.codigo:'—';document.getElementById('tvNome').textContent=a?(a.nome||'—'):'Aguardando';document.getElementById('tvSala').textContent=a?(a.ponto||''):'';document.getElementById('tvList').innerHTML=fila.slice(0,4).map(q=>`<div class="tv-row"><div class="s">${q.codigo}</div><div class="nn">${esc(q.nome||'—')}<small>${esc(q.modalidade)}</small></div><div class="sl">${esc(q.ponto||'')}</div></div>`).join('');}
+function tick(){const d=new Date(),c=document.getElementById('tvClock'),t=document.getElementById('tvToday');if(c)c.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');if(t)t.textContent=d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});}tick();setInterval(tick,10000);
+const conn=new signalR.HubConnectionBuilder().withUrl('/hubs/senha').withAutomaticReconnect().build();conn.on('FilaAtualizada',f=>{fila=f;render()});conn.on('SenhaChamada',()=>{const e=document.getElementById('tvCurrent');e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash')});conn.start().then(()=>conn.invoke('EntrarNaFilial',filialId));render();
+</script>}

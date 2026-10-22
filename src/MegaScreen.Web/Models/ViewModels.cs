@@ -17,8 +17,6 @@ public class NovaSenhaViewModel
     [JsonPropertyName("prioridade")] public Prioridade Prioridade { get; set; } = Prioridade.Normal;
 }
 
-// Objeto enviado ao painel/TV via SignalR e embutido nas views.
-// Nomes fixados em minúsculas para consistência entre MVC, SignalR e o embed Razor.
 public class SenhaDto
 {
     [JsonPropertyName("id")] public int Id { get; set; }
@@ -29,6 +27,8 @@ public class SenhaDto
     [JsonPropertyName("status")] public string Status { get; set; } = "Aguardando";
     [JsonPropertyName("ponto")] public string? Ponto { get; set; }
     [JsonPropertyName("sala")] public string? Sala { get; set; }
+    [JsonPropertyName("criadaEm")] public DateTime CriadaEm { get; set; }
+    [JsonPropertyName("chamadaEm")] public DateTime? ChamadaEm { get; set; }
 
     public static SenhaDto From(Senha s) => new()
     {
@@ -38,6 +38,8 @@ public class SenhaDto
         Modalidade = s.Modalidade?.Nome ?? "",
         Prioridade = s.Prioridade.ToString(),
         Status = s.Status.ToString(),
-        Ponto = s.PontoAtendimento
+        Ponto = s.PontoAtendimento,
+        CriadaEm = s.CriadaEm,
+        ChamadaEm = s.ChamadaEm
     };
 }

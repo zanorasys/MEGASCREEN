@@ -1,7 +1,6 @@
 @page
 @model MegaScreen.Web.Pages.Clientes.IndexModel
-@{ ViewData["Title"] = "Gestão de Clientes"; }
-<div class="page-head"><div><h2>Gestão de Clientes <span class="pri alta">White Label</span></h2><p>Clientes PJ/PF e gestão de senhas por cliente.</p></div><div class="spacer"></div><button class="btn pri-btn2">Novo cliente</button></div>
-<div class="card"><table><thead><tr><th>Cliente</th><th>Tipo</th><th>Documento</th><th>Filiais</th><th>Status</th></tr></thead><tbody>
-@foreach (var c in Model.Itens) { <tr><td class="nm">@c.Nome</td><td><span class="badge-type tv">@c.Tipo</span></td><td>@c.Documento</td><td>@c.Filiais.Count</td><td><span class="st @(c.Ativo ? "on" : "off")">@(c.Ativo ? "Ativo" : "Suspenso")</span></td></tr> }
-</tbody></table></div>
+@{ViewData["Title"]="Gestão de Clientes";}
+<div class="page-head"><div><h2>Gestão de Clientes</h2><p>Clientes da operação White Label.</p></div></div>
+<div class="cfg-grid"><div class="card"><div class="card-head"><h2>@(Model.Item.Id==0?"Novo cliente":"Editar cliente")</h2></div><form method="post" asp-page-handler="Save" class="form-pad"><input asp-for="Item.Id" type="hidden"><div class="field"><label>Razão social / Nome</label><input asp-for="Item.Nome"></div><div class="form2"><div class="field"><label>Tipo</label><select asp-for="Item.Tipo" asp-items="Html.GetEnumSelectList<TipoCliente>()"></select></div><div class="field"><label>CNPJ / CPF</label><input asp-for="Item.Documento"></div></div><label class="check"><input asp-for="Item.Ativo"> Ativo</label><div asp-validation-summary="All" class="validation"></div><div style="margin-top:14px"><button class="btn pri-btn2">Salvar</button>@if(Model.Item.Id>0){<a class="btn line" asp-page="./Index">Cancelar</a>}</div></form></div>
+<div class="card"><table><thead><tr><th>Cliente</th><th>Tipo</th><th>Documento</th><th>Filiais</th><th>Status</th><th></th></tr></thead><tbody>@foreach(var c in Model.Itens){<tr><td class="nm">@c.Nome</td><td>@c.Tipo</td><td>@c.Documento</td><td>@c.Filiais.Count</td><td><span class="st @(c.Ativo?"on":"off")">@(c.Ativo?"Ativo":"Inativo")</span></td><td><div class="rowacts"><a class="iconbtn" asp-route-edit="@c.Id">✎</a><form method="post" asp-page-handler="Delete" asp-route-id="@c.Id"><button class="iconbtn">×</button></form></div></td></tr>}</tbody></table></div></div>

@@ -1,7 +1,13 @@
 @page
 @model MegaScreen.Web.Pages.SalasEspera.IndexModel
-@{ ViewData["Title"] = "Salas de Espera"; }
-<div class="page-head"><div><h2>Salas de Espera &amp; Pontos de Atendimento</h2><p>Ambientes de espera e os guichês vinculados.</p></div><div class="spacer"></div><button class="btn pri-btn2">Nova sala de espera</button></div>
-<div class="card"><table><thead><tr><th>Nome</th><th>Apelido</th><th>Telas</th><th>Guichês</th></tr></thead><tbody>
-@foreach (var s in Model.Itens) { <tr><td class="nm">@s.Nome</td><td>@s.Apelido</td><td>@s.Telas.Count</td><td>@s.Pontos.Count</td></tr> }
-</tbody></table></div>
+@{ViewData["Title"]="Salas de Espera";}
+<div class="page-head"><div><h2>Salas de Espera &amp; Pontos de Atendimento</h2><p>Ambientes de espera e os guichês vinculados a cada um.</p></div></div>
+<div class="cfg-grid">
+<div class="stack">
+<div class="card"><div class="card-head"><h2>@(Model.Item.Id==0?"Nova sala de espera":"Editar sala de espera")</h2></div><form method="post" asp-page-handler="Save" class="form-pad"><input asp-for="Item.Id" type="hidden"><div class="form2"><div class="field"><label>Nome</label><input asp-for="Item.Nome"></div><div class="field"><label>Apelido</label><input asp-for="Item.Apelido"></div></div><div asp-validation-summary="All" class="validation"></div><button class="btn pri-btn2">Salvar</button>@if(Model.Item.Id>0){<a class="btn line" asp-page="./Index">Cancelar</a>}</form></div>
+<div class="card"><div class="card-head"><h2>Novo ponto de atendimento</h2></div><form method="post" asp-page-handler="SavePonto" class="form-pad"><div class="field"><label>Sala de espera</label><select asp-for="Ponto.SalaEsperaId"><option value="">Selecione</option>@foreach(var s in Model.Itens){<option value="@s.Id">@s.Nome</option>}</select></div><div class="field"><label>Nome do guichê/ponto</label><input asp-for="Ponto.Nome" placeholder="Guichê 1"></div><label class="check"><input asp-for="Ponto.Ativo" checked> Ativo</label><div style="margin-top:14px"><button class="btn pri-btn2">Adicionar ponto</button></div></form></div>
+</div>
+<div class="stack">
+<div class="card"><table><thead><tr><th>Nome</th><th>Apelido</th><th>Telas</th><th>Guichês</th><th></th></tr></thead><tbody>@foreach(var s in Model.Itens){<tr><td class="nm">@s.Nome</td><td>@s.Apelido</td><td>@s.Telas.Count</td><td>@s.Pontos.Count</td><td><div class="rowacts"><a class="iconbtn" asp-route-edit="@s.Id">✎</a><form method="post" asp-page-handler="Delete" asp-route-id="@s.Id"><button class="iconbtn">×</button></form></div></td></tr>}</tbody></table></div>
+<div class="card"><div class="card-head"><h2>Pontos cadastrados</h2></div><div class="rooms">@foreach(var p in Model.Pontos){var sala=Model.Itens.FirstOrDefault(x=>x.Id==p.SalaEsperaId);<div class="room"><span class="rdot" style="background:@(p.Ativo?"var(--green)":"var(--amber)")"></span><span class="rname">@p.Nome <small>· @sala?.Nome</small></span><span class="rstate @(p.Ativo?"free":"paused")">@(p.Ativo?"Ativo":"Pausado")</span><form method="post" asp-page-handler="DeletePonto" asp-route-id="@p.Id"><button class="iconbtn">×</button></form></div>}</div></div>
+</div></div>

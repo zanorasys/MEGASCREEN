@@ -16,13 +16,13 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/Clientes", "AdminOnly");
     options.Conventions.AuthorizeFolder("/Filiais", "AdminOnly");
 });
-
 builder.Services.AddSignalR();
-
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<AppRepository>();
 builder.Services.AddScoped<DatabaseInitializer>();
 builder.Services.AddScoped<SenhaService>();
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>
@@ -31,6 +31,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         opt.LogoutPath = "/Account/Logout";
         opt.AccessDeniedPath = "/Account/Login";
         opt.ExpireTimeSpan = TimeSpan.FromHours(8);
+        opt.SlidingExpiration = true;
     });
 
 builder.Services.AddAuthorization(options =>
@@ -62,13 +63,27 @@ api.MapGet("/fila/{filialId:int}", async (int filialId, SenhaService svc) =>
 
 api.MapPost("/emitir/{filialId:int}", async (int filialId, NovaSenhaViewModel vm, SenhaService svc) =>
 {
+    if (vm.ModalidadeId <= 0 || !Enum.IsDefined(typeof(Prioridade), vm.Prioridade))
+        return Results.BadRequest(new { erro = "Dados da senha inválidos." });
     var senha = await svc.EmitirAsync(filialId, vm);
     return Results.Json(SenhaDto.From(senha));
 }).AllowAnonymous();
 
 api.MapPost("/chamar/{id:int}", async (int id, string? ponto, SenhaService svc) =>
 {
-    await svc.ChamarAsync(id, ponto ?? "Guichê");
+    await svc.ChamarAsync(id, string.IsNullOrWhiteSpace(ponto) ? "Guichê" : ponto);
+    return Results.Ok();
+}).RequireAuthorization();
+
+api.MapPost("/rechamar/{id:int}", async (int id, SenhaService svc) =>
+{
+    await svc.RechamarAsync(id);
+    return Results.Ok();
+}).RequireAuthorization();
+
+api.MapPost("/mover/{id:int}", async (int id, string destino, SenhaService svc) =>
+{
+    await svc.MoverAsync(id, destino);
     return Results.Ok();
 }).RequireAuthorization();
 
@@ -80,6 +95,7 @@ api.MapPost("/concluir/{id:int}", async (int id, SenhaService svc) =>
 
 api.MapPost("/status/{id:int}/{status:int}", async (int id, int status, SenhaService svc) =>
 {
+    if (!Enum.IsDefined(typeof(StatusSenha), status)) return Results.BadRequest();
     await svc.AtualizarStatusAsync(id, (StatusSenha)status);
     return Results.Ok();
 }).RequireAuthorization();

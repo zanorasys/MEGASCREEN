@@ -1,18 +1,9 @@
 @page
-@{ Layout = null; ViewData["Title"] = "Recuperar acesso"; }
-<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="~/css/site.css" /></head>
-<body>
-<div class="auth">
-    <div class="brandside"><div class="logo"><div class="mark"></div><div><h1>Mega Screen</h1><small>Sistema de Senhas</small></div></div></div>
-    <div class="formside"><div class="fbox">
-        <h3>Recuperar acesso</h3>
-        <p class="lead">Informe seu e-mail e enviaremos um link para redefinir a senha.</p>
-        <div class="field"><label>E-mail cadastrado</label><input type="email" /></div>
-        <button class="btn pri-btn block">Enviar link</button>
-        <a class="btn ghost block" asp-page="/Account/Login" style="margin-top:10px">Voltar ao login</a>
-    </div></div>
-</div>
-</body></html>
+@model MegaScreen.Web.Pages.Account.EsqueciSenhaModel
+@{ Layout=null; }
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="~/css/site.css"></head><body>
+<div class="auth"><div class="brandside"><div class="logo"><div class="mark"></div><div><h1>Mega Screen</h1><small>Sistema de Senhas</small></div></div><div class="pitch"><h2>Recupere seu acesso com segurança.</h2><p>Informe o e-mail cadastrado.</p></div></div><div class="formside"><div class="fbox"><h3>Recuperar acesso</h3>
+@if(Model.Enviado){<div class="alert-ok">Se o e-mail existir, o link de redefinição foi gerado.</div>
+@if(!string.IsNullOrWhiteSpace(Model.DevLink)){<p class="hint">SMTP está desabilitado. Em desenvolvimento, use:</p><a class="link" href="@Model.DevLink">Abrir redefinição de senha</a>}}
+<form method="post"><div class="field"><label>E-mail cadastrado</label><input asp-for="Email" type="email" required></div><button class="btn pri-btn block">Enviar link</button></form>
+<a class="btn ghost block" asp-page="/Account/Login" style="margin-top:10px">Voltar ao login</a></div></div></div></body></html>

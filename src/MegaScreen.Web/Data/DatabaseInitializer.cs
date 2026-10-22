@@ -10,7 +10,6 @@ public sealed class DatabaseInitializer(IConfiguration configuration, IDbConnect
     public async Task InitializeAsync()
     {
         await EnsureDatabaseAsync();
-
         using var db = connectionFactory.CreateConnection();
         await db.ExecuteAsync(SchemaSql);
 
@@ -28,31 +27,42 @@ public sealed class DatabaseInitializer(IConfiguration configuration, IDbConnect
 
         var centroId = await db.ExecuteScalarAsync<int>("""
             INSERT INTO Filiais (ClienteId, Nome, Cidade, Uf, ImpressoraHabilitada, Ativa)
-            VALUES (@ClienteId, @Nome, @Cidade, @Uf, 1, 1);
+            VALUES (@ClienteId, 'Unidade Centro', 'Curitiba', 'PR', 1, 1);
             SELECT CAST(SCOPE_IDENTITY() AS int);
-            """, new { ClienteId = clienteId, Nome = "Unidade Centro", Cidade = "Curitiba", Uf = "PR" }, tx);
+            """, new { ClienteId = clienteId }, tx);
 
         await db.ExecuteAsync("""
             INSERT INTO Filiais (ClienteId, Nome, Cidade, Uf, ImpressoraHabilitada, Ativa)
-            VALUES (@ClienteId, @Nome, @Cidade, @Uf, 0, 1);
-            """, new { ClienteId = clienteId, Nome = "Unidade Norte", Cidade = "Curitiba", Uf = "PR" }, tx);
+            VALUES (@ClienteId, 'Unidade Norte', 'Curitiba', 'PR', 0, 1),
+                   (@ClienteId, 'Unidade Sul', 'Curitiba', 'PR', 0, 1);
+            """, new { ClienteId = clienteId }, tx);
 
         const string insertUsuario = """
             INSERT INTO Usuarios (FilialId, Nome, Email, SenhaHash, Perfil, LocalAtual, Ativo)
-            VALUES (@FilialId, @Nome, @Email, @SenhaHash, @Perfil, @LocalAtual, 1);
+            VALUES (@FilialId, @Nome, @Email, @SenhaHash, @Perfil, @LocalAtual, @Ativo);
             """;
         await db.ExecuteAsync(insertUsuario, new[]
         {
-            new { FilialId = centroId, Nome = "Humberto Garotti", Email = "humberto@pontobrweb.com.br", SenhaHash = PasswordHasher.Hash("123456"), Perfil = (int)PerfilUsuario.Admin, LocalAtual = "Recepção I" },
-            new { FilialId = centroId, Nome = "Ana Souza", Email = "ana@empresa.com.br", SenhaHash = PasswordHasher.Hash("123456"), Perfil = (int)PerfilUsuario.Atendente, LocalAtual = "Guichê 2" },
-            new { FilialId = centroId, Nome = "Dr. Carlos Lima", Email = "carlos@empresa.com.br", SenhaHash = PasswordHasher.Hash("123456"), Perfil = (int)PerfilUsuario.Profissional, LocalAtual = "Consultório 1" }
+            new { FilialId = centroId, Nome = "Humberto Garotti", Email = "humberto@pontobrweb.com.br", SenhaHash = PasswordHasher.Hash("12345678"), Perfil = (int)PerfilUsuario.Admin, LocalAtual = "Recepção I", Ativo = true },
+            new { FilialId = centroId, Nome = "Ana Souza", Email = "ana@empresa.com.br", SenhaHash = PasswordHasher.Hash("12345678"), Perfil = (int)PerfilUsuario.Atendente, LocalAtual = "Guichê 2", Ativo = true },
+            new { FilialId = centroId, Nome = "Dr. Carlos Lima", Email = "carlos@empresa.com.br", SenhaHash = PasswordHasher.Hash("12345678"), Perfil = (int)PerfilUsuario.Profissional, LocalAtual = "Consultório 1", Ativo = true }
         }, tx);
 
         var recepcaoId = await db.ExecuteScalarAsync<int>("""
             INSERT INTO SalasEspera (FilialId, Nome, Apelido)
-            VALUES (@FilialId, @Nome, @Apelido);
+            VALUES (@FilialId, 'Recepção I', 'REC-1');
             SELECT CAST(SCOPE_IDENTITY() AS int);
-            """, new { FilialId = centroId, Nome = "Recepção I", Apelido = "REC-1" }, tx);
+            """, new { FilialId = centroId }, tx);
+        var labEsperaId = await db.ExecuteScalarAsync<int>("""
+            INSERT INTO SalasEspera (FilialId, Nome, Apelido)
+            VALUES (@FilialId, 'Laboratório', 'LAB');
+            SELECT CAST(SCOPE_IDENTITY() AS int);
+            """, new { FilialId = centroId }, tx);
+        var imgEsperaId = await db.ExecuteScalarAsync<int>("""
+            INSERT INTO SalasEspera (FilialId, Nome, Apelido)
+            VALUES (@FilialId, 'Imagem', 'IMG');
+            SELECT CAST(SCOPE_IDENTITY() AS int);
+            """, new { FilialId = centroId }, tx);
 
         for (var i = 1; i <= 5; i++)
             await db.ExecuteAsync("""
@@ -60,14 +70,21 @@ public sealed class DatabaseInitializer(IConfiguration configuration, IDbConnect
                 VALUES (@SalaEsperaId, @Nome, @Ativo);
                 """, new { SalaEsperaId = recepcaoId, Nome = $"Guichê {i}", Ativo = i <= 4 }, tx);
 
+        await db.ExecuteAsync("""
+            INSERT INTO PontosAtendimento (SalaEsperaId, Nome, Ativo)
+            VALUES (@Lab, 'Coleta 1', 1), (@Lab, 'Coleta 2', 1), (@Lab, 'Coleta 3', 1),
+                   (@Img, 'Imagem 1', 1), (@Img, 'Imagem 2', 1);
+            """, new { Lab = labEsperaId, Img = imgEsperaId }, tx);
+
         const string insertTela = """
             INSERT INTO Telas (FilialId, Nome, Apelido, Tipo, Predio, Andar, Ramal, Cor, Visivel, SalaEsperaId)
-            VALUES (@FilialId, @Nome, @Apelido, @Tipo, @Predio, @Andar, @Ramal, @Cor, 1, @SalaEsperaId);
+            VALUES (@FilialId, @Nome, @Apelido, @Tipo, @Predio, @Andar, @Ramal, @Cor, @Visivel, @SalaEsperaId);
             """;
         await db.ExecuteAsync(insertTela, new[]
         {
-            new { FilialId = centroId, Nome = "Recepção Térreo", Apelido = "REC-T", Tipo = (int)TipoTela.TvHorizontal, Predio = "A", Andar = "Térreo", Ramal = "201", Cor = "#4C5BF5", SalaEsperaId = recepcaoId },
-            new { FilialId = centroId, Nome = "Totem Entrada", Apelido = "TOT-1", Tipo = (int)TipoTela.TabletVertical, Predio = "A", Andar = "Térreo", Ramal = "202", Cor = "#12A150", SalaEsperaId = recepcaoId }
+            new { FilialId = centroId, Nome = "Recepção Térreo", Apelido = "REC-T", Tipo = (int)TipoTela.TvHorizontal, Predio = "A", Andar = "Térreo", Ramal = "201", Cor = "#4C5BF5", Visivel = true, SalaEsperaId = (int?)recepcaoId },
+            new { FilialId = centroId, Nome = "Totem Entrada", Apelido = "TOT-1", Tipo = (int)TipoTela.TabletVertical, Predio = "A", Andar = "Térreo", Ramal = "202", Cor = "#12A150", Visivel = true, SalaEsperaId = (int?)recepcaoId },
+            new { FilialId = centroId, Nome = "Laboratório 1º andar", Apelido = "LAB-1", Tipo = (int)TipoTela.TvHorizontal, Predio = "B", Andar = "1º andar", Ramal = "310", Cor = "#F5892E", Visivel = false, SalaEsperaId = (int?)labEsperaId }
         }, tx);
 
         const string insertSala = """
@@ -77,19 +94,26 @@ public sealed class DatabaseInitializer(IConfiguration configuration, IDbConnect
         await db.ExecuteAsync(insertSala, new[]
         {
             new { FilialId = centroId, Nome = "Consultório 1", Apelido = "C1", Predio = "A", Andar = "1º", Ramal = "2011", Cor = "#4C5BF5" },
-            new { FilialId = centroId, Nome = "Coleta A", Apelido = "COL-A", Predio = "A", Andar = "Térreo", Ramal = "2015", Cor = "#4C5BF5" }
+            new { FilialId = centroId, Nome = "Coleta A", Apelido = "COL-A", Predio = "A", Andar = "Térreo", Ramal = "2015", Cor = "#12A150" },
+            new { FilialId = centroId, Nome = "Sala de Imagem", Apelido = "IMG-1", Predio = "B", Andar = "1º", Ramal = "3101", Cor = "#F5892E" }
         }, tx);
 
         const string insertModalidade = """
             INSERT INTO Modalidades (FilialId, Nome, Prefixo, PrioridadeInterna, Ativa, Contador)
-            VALUES (@FilialId, @Nome, @Prefixo, @PrioridadeInterna, 1, 0);
+            VALUES (@FilialId, @Nome, @Prefixo, @PrioridadeInterna, @Ativa, 0);
             """;
         await db.ExecuteAsync(insertModalidade, new[]
         {
-            new { FilialId = centroId, Nome = "Agendamento de Consultas", Prefixo = "A", PrioridadeInterna = (int)Prioridade.Normal },
-            new { FilialId = centroId, Nome = "Retirada de Exames", Prefixo = "P", PrioridadeInterna = (int)Prioridade.Alta },
-            new { FilialId = centroId, Nome = "Informações", Prefixo = "I", PrioridadeInterna = (int)Prioridade.Normal }
+            new { FilialId = centroId, Nome = "Agendamento de Consultas", Prefixo = "A", PrioridadeInterna = (int)Prioridade.Normal, Ativa = true },
+            new { FilialId = centroId, Nome = "Retirada de Exames", Prefixo = "P", PrioridadeInterna = (int)Prioridade.Alta, Ativa = true },
+            new { FilialId = centroId, Nome = "Informações", Prefixo = "I", PrioridadeInterna = (int)Prioridade.Normal, Ativa = false }
         }, tx);
+
+        await db.ExecuteAsync("""
+            INSERT INTO Personalizacoes
+                (FilialId, CorFundo, CorTexto, CorDestaque, Fonte, MostrarHorario, MostrarNumero, MostrarOrdem, MostrarSala, Marca)
+            VALUES (@FilialId, '#0B0D24', '#FFFFFF', '#4C5BF5', 'Manrope', 1, 1, 1, 1, 'Sua Marca');
+            """, new { FilialId = centroId }, tx);
 
         tx.Commit();
     }
@@ -100,20 +124,15 @@ public sealed class DatabaseInitializer(IConfiguration configuration, IDbConnect
             ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection não configurada.");
         var cs = new SqlConnectionStringBuilder(connectionString);
         var databaseName = cs.InitialCatalog;
-
-        if (string.IsNullOrWhiteSpace(databaseName))
-            return;
+        if (string.IsNullOrWhiteSpace(databaseName)) return;
 
         cs.InitialCatalog = "master";
         await using var master = new SqlConnection(cs.ConnectionString);
         await master.OpenAsync();
-
         var safeName = databaseName.Replace("]", "]]");
         var exists = await master.ExecuteScalarAsync<int>(
             "SELECT COUNT(1) FROM sys.databases WHERE name = @databaseName;", new { databaseName });
-
-        if (exists == 0)
-            await master.ExecuteAsync($"CREATE DATABASE [{safeName}];");
+        if (exists == 0) await master.ExecuteAsync($"CREATE DATABASE [{safeName}];");
     }
 
     private const string SchemaSql = """
@@ -176,7 +195,7 @@ public sealed class DatabaseInitializer(IConfiguration configuration, IDbConnect
                 SalaEsperaId int NOT NULL,
                 Nome nvarchar(80) NOT NULL,
                 Ativo bit NOT NULL CONSTRAINT DF_PontosAtendimento_Ativo DEFAULT(1),
-                CONSTRAINT FK_PontosAtendimento_SalasEspera FOREIGN KEY (SalaEsperaId) REFERENCES SalasEspera(Id)
+                CONSTRAINT FK_PontosAtendimento_SalasEspera FOREIGN KEY (SalaEsperaId) REFERENCES SalasEspera(Id) ON DELETE CASCADE
             );
         END;
 
@@ -195,7 +214,7 @@ public sealed class DatabaseInitializer(IConfiguration configuration, IDbConnect
                 Visivel bit NOT NULL CONSTRAINT DF_Telas_Visivel DEFAULT(1),
                 SalaEsperaId int NULL,
                 CONSTRAINT FK_Telas_Filiais FOREIGN KEY (FilialId) REFERENCES Filiais(Id),
-                CONSTRAINT FK_Telas_SalasEspera FOREIGN KEY (SalaEsperaId) REFERENCES SalasEspera(Id)
+                CONSTRAINT FK_Telas_SalasEspera FOREIGN KEY (SalaEsperaId) REFERENCES SalasEspera(Id) ON DELETE SET NULL
             );
         END;
 
@@ -249,6 +268,39 @@ public sealed class DatabaseInitializer(IConfiguration configuration, IDbConnect
                 CONSTRAINT FK_Senhas_Salas FOREIGN KEY (SalaId) REFERENCES Salas(Id)
             );
             CREATE INDEX IX_Senhas_Filial_Status_CriadaEm ON Senhas(FilialId, Status, CriadaEm);
+        END;
+
+        IF OBJECT_ID('Personalizacoes', 'U') IS NULL
+        BEGIN
+            CREATE TABLE Personalizacoes (
+                FilialId int NOT NULL CONSTRAINT PK_Personalizacoes PRIMARY KEY,
+                CorFundo nvarchar(9) NOT NULL CONSTRAINT DF_Pers_Fundo DEFAULT('#0B0D24'),
+                CorTexto nvarchar(9) NOT NULL CONSTRAINT DF_Pers_Texto DEFAULT('#FFFFFF'),
+                CorDestaque nvarchar(9) NOT NULL CONSTRAINT DF_Pers_Destaque DEFAULT('#4C5BF5'),
+                Fonte nvarchar(100) NOT NULL CONSTRAINT DF_Pers_Fonte DEFAULT('Manrope'),
+                MostrarHorario bit NOT NULL CONSTRAINT DF_Pers_Hora DEFAULT(1),
+                MostrarNumero bit NOT NULL CONSTRAINT DF_Pers_Numero DEFAULT(1),
+                MostrarOrdem bit NOT NULL CONSTRAINT DF_Pers_Ordem DEFAULT(1),
+                MostrarSala bit NOT NULL CONSTRAINT DF_Pers_Sala DEFAULT(1),
+                LogoUrl nvarchar(300) NULL,
+                FundoUrl nvarchar(300) NULL,
+                VideoUrl nvarchar(300) NULL,
+                Marca nvarchar(80) NOT NULL CONSTRAINT DF_Pers_Marca DEFAULT('Sua Marca'),
+                CONSTRAINT FK_Personalizacoes_Filiais FOREIGN KEY (FilialId) REFERENCES Filiais(Id) ON DELETE CASCADE
+            );
+        END;
+
+        IF OBJECT_ID('PasswordResetTokens', 'U') IS NULL
+        BEGIN
+            CREATE TABLE PasswordResetTokens (
+                Id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_PasswordResetTokens PRIMARY KEY,
+                UsuarioId int NOT NULL,
+                TokenHash nvarchar(64) NOT NULL,
+                ExpiraEm datetime2 NOT NULL,
+                UsadoEm datetime2 NULL,
+                CONSTRAINT FK_PasswordResetTokens_Usuarios FOREIGN KEY (UsuarioId) REFERENCES Usuarios(Id) ON DELETE CASCADE
+            );
+            CREATE UNIQUE INDEX IX_PasswordResetTokens_TokenHash ON PasswordResetTokens(TokenHash);
         END;
         """;
 }

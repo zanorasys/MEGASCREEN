@@ -13,6 +13,7 @@
             <div class="lbl">Atendendo agora</div><div class="big" id="profSenha">—</div><div class="who" id="profNome">Nenhum paciente</div><div class="tags" id="profTags"></div>
             <div class="prof-actions">
                 <button class="bigbtn call" id="profCall">Chamar próximo</button>
+                <button class="bigbtn recall" id="profRecall">Rechamar</button>
                 <button class="bigbtn done" id="profDone">Concluir</button>
                 <button class="bigbtn miss" id="profMiss">Não compareceu</button>
             </div>
@@ -36,9 +37,9 @@
         profNext.innerHTML=nxt.length?nxt.map((q,i)=>`<div class="next-item"><div class="o">${String(i+1).padStart(2,'0')}</div><span class="s">${q.codigo}</span><div class="nm2">${esc(q.nome||'—')}<small>${esc(q.modalidade)}</small></div></div>`).join(''):'<div class="next-empty">Fila vazia.</div>';
     }
     async function chamarProximo(){const n=fila.find(q=>q.status==='Aguardando');if(!n)return;await fetch(`/api/senhas/chamar/${n.id}?ponto=${encodeURIComponent(profRoom.value)}`,{method:'POST'});}
-    async function concluir(){const a=fila.find(q=>q.status==='EmAtendimento');if(!a)return;await fetch(`/api/senhas/concluir/${a.id}`,{method:'POST'});}
+    async function rechamar(){const a=fila.find(q=>q.status==='EmAtendimento');if(!a)return;await fetch(`/api/senhas/rechamar/${a.id}`,{method:'POST'});} async function concluir(){const a=fila.find(q=>q.status==='EmAtendimento');if(!a)return;await fetch(`/api/senhas/concluir/${a.id}`,{method:'POST'});}
     async function naoCompareceu(){const a=fila.find(q=>q.status==='EmAtendimento');if(!a)return;await fetch(`/api/senhas/status/${a.id}/4`,{method:'POST'});}
-    profCall.onclick=chamarProximo; profDone.onclick=concluir; profMiss.onclick=naoCompareceu;
+    profCall.onclick=chamarProximo; profRecall.onclick=rechamar; profDone.onclick=concluir; profMiss.onclick=naoCompareceu;
     const conn=new signalR.HubConnectionBuilder().withUrl('/hubs/senha').withAutomaticReconnect().build();
     conn.on('FilaAtualizada',f=>{fila=f;render();});
     conn.start().then(()=>conn.invoke('EntrarNaFilial',filialId)).catch(console.error);

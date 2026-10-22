@@ -1,11 +1,7 @@
 @page
 @model MegaScreen.Web.Pages.Modalidades.IndexModel
-@{ ViewData["Title"] = "Modalidades"; }
-<div class="page-head"><div><h2>Modalidades de Atendimento</h2><p>Tipos de serviço e sua prioridade interna.</p></div><div class="spacer"></div><button class="btn pri-btn2">Nova modalidade</button></div>
-<div class="card"><table><thead><tr><th>Modalidade</th><th>Prefixo</th><th>Prioridade interna</th><th>Status</th></tr></thead><tbody>
-@foreach (var m in Model.Itens)
-{
-    var cls = m.PrioridadeInterna == Prioridade.Alta ? "alta" : (m.PrioridadeInterna == Prioridade.Idoso ? "idoso" : "normal");
-    <tr><td class="nm">@m.Nome</td><td><span class="senha-chip">@m.Prefixo</span></td><td><span class="pri @cls">@m.PrioridadeInterna</span></td><td><span class="st @(m.Ativa ? "on" : "off")">@(m.Ativa ? "Ativa" : "Inativa")</span></td></tr>
-}
-</tbody></table></div>
+@{ViewData["Title"]="Modalidades";}
+<div class="page-head"><div><h2>Modalidades de Atendimento</h2><p>Tipos de serviço e sua prioridade interna.</p></div></div>
+<div class="cfg-grid"><div class="card"><div class="card-head"><h2>@(Model.Item.Id==0?"Nova modalidade":"Editar modalidade")</h2></div><form method="post" asp-page-handler="Save" class="form-pad"><input asp-for="Item.Id" type="hidden">
+<div class="field"><label>Modalidade</label><input asp-for="Item.Nome"></div><div class="field"><label>Prefixo</label><input asp-for="Item.Prefixo" maxlength="3"></div><div class="field"><label>Prioridade interna</label><select asp-for="Item.PrioridadeInterna" asp-items="Html.GetEnumSelectList<Prioridade>()"></select></div><label class="check"><input asp-for="Item.Ativa"> Ativa</label><div asp-validation-summary="All" class="validation"></div><div style="margin-top:14px"><button class="btn pri-btn2">Salvar</button>@if(Model.Item.Id>0){<a class="btn line" asp-page="./Index">Cancelar</a>}</div></form></div>
+<div class="card"><table><thead><tr><th>Modalidade</th><th>Prefixo</th><th>Prioridade</th><th>Status</th><th></th></tr></thead><tbody>@foreach(var m in Model.Itens){<tr><td class="nm">@m.Nome</td><td><span class="senha-chip">@m.Prefixo</span></td><td>@m.PrioridadeInterna</td><td><span class="st @(m.Ativa?"on":"off")">@(m.Ativa?"Ativa":"Inativa")</span></td><td><div class="rowacts"><a class="iconbtn" asp-route-edit="@m.Id">✎</a><form method="post" asp-page-handler="Delete" asp-route-id="@m.Id"><button class="iconbtn">×</button></form></div></td></tr>}</tbody></table></div></div>

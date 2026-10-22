@@ -1,18 +1,16 @@
-using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MegaScreen.Web.Data;
+using MegaScreen.Web.Infrastructure;
 using MegaScreen.Web.Models;
 
 namespace MegaScreen.Web.Pages.Salas;
 
 public class IndexModel(AppRepository repository) : PageModel
 {
-    protected int FilialId => int.TryParse(User.FindFirstValue("FilialId"), out var f) ? f : 1;
-    public List<Sala> Itens { get; private set; } = new();
-
-    public async Task OnGetAsync()
-    {
-        ViewData["FilialId"] = FilialId;
-        Itens = await repository.ListarSalasAsync(FilialId);
-    }
+    public List<Sala> Itens { get; private set; }=new();
+    [BindProperty] public Sala Item { get; set; }=new();
+    public async Task OnGetAsync(int? edit){var fid=User.FilialId();ViewData["FilialId"]=fid;Itens=await repository.ListarSalasAsync(fid);Item=edit is >0?Itens.FirstOrDefault(x=>x.Id==edit)??new Sala{FilialId=fid}:new Sala{FilialId=fid,Cor="#4C5BF5"};}
+    public async Task<IActionResult> OnPostSaveAsync(){Item.FilialId=User.FilialId();if(string.IsNullOrWhiteSpace(Item.Nome))ModelState.AddModelError("","Informe o nome.");if(!ModelState.IsValid){await OnGetAsync(Item.Id==0?null:Item.Id);return Page();}await repository.SalvarSalaAsync(Item);TempData["Toast"]="Sala salva.";return RedirectToPage();}
+    public async Task<IActionResult> OnPostDeleteAsync(int id){await repository.ExcluirSalaAsync(id,User.FilialId());TempData["Toast"]="Sala removida.";return RedirectToPage();}
 }
