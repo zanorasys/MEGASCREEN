@@ -4,7 +4,7 @@
     var perfil = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Atendente";
     var nome = User.Identity?.Name ?? "Usuário";
     var iniciais = string.Concat(nome.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => p[0])).ToUpper();
-    string Active(string page) => (ViewContext.RouteData.Values["page"]?.ToString() ?? "").StartsWith(page, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    string Active(string page) => (ViewContext.RouteData.Values["page"]?.ToString() ?? "").StartsWith(page + "/", StringComparison.OrdinalIgnoreCase) ? "active" : "";
     var filialId = int.TryParse(User.FindFirst("FilialId")?.Value, out var f) ? f : 1;
     var filialNome = User.FindFirst("FilialNome")?.Value ?? "Filial";
     var localAtual = User.FindFirst("LocalAtual")?.Value ?? "Recepção I";
@@ -44,8 +44,9 @@
 <main class="content"><div class="toasts" id="toasts"></div>@if(TempData["Toast"] is string toast){<div class="alert-ok">@toast</div>}@RenderBody()</main>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<script src="~/js/mascaras.js" asp-append-version="true"></script>
 <script>
-(()=>{const tick=()=>{const d=new Date(),c=document.getElementById('clock'),t=document.getElementById('today');if(c)c.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');if(t)t.textContent=d.toLocaleDateString('pt-BR',{weekday:'long'});};tick();setInterval(tick,10000);document.addEventListener('click',e=>{document.querySelectorAll('.filial.open').forEach(x=>{if(!x.contains(e.target))x.classList.remove('open')})});})();
+(()=>{const TZ='America/Sao_Paulo';const tick=()=>{const d=new Date(),c=document.getElementById('clock'),t=document.getElementById('today');if(c)c.textContent=d.toLocaleTimeString('pt-BR',{timeZone:TZ,hour:'2-digit',minute:'2-digit'});if(t)t.textContent=d.toLocaleDateString('pt-BR',{timeZone:TZ,weekday:'long'});};tick();setInterval(tick,10000);document.addEventListener('click',e=>{document.querySelectorAll('.filial.open').forEach(x=>{if(!x.contains(e.target))x.classList.remove('open')})});})();
 </script>
 @await RenderSectionAsync("Scripts", required:false)
 </body></html>

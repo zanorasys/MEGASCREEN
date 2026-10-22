@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using MegaScreen.Web.Infrastructure;
 
 namespace MegaScreen.Web.Models;
 
@@ -13,7 +14,7 @@ public class Cliente
     public int Id { get; set; }
     [Required, StringLength(150)] public string Nome { get; set; } = "";
     public TipoCliente Tipo { get; set; } = TipoCliente.PJ;
-    [StringLength(20)] public string? Documento { get; set; }
+    [Display(Name = "CNPJ / CPF"), StringLength(20)] public string? Documento { get; set; }
     public bool Ativo { get; set; } = true;
     public ICollection<Filial> Filiais { get; set; } = new List<Filial>();
 }
@@ -21,11 +22,11 @@ public class Cliente
 public class Filial
 {
     public int Id { get; set; }
-    public int ClienteId { get; set; }
+    [Display(Name = "Cliente")] public int ClienteId { get; set; }
     public Cliente? Cliente { get; set; }
     [Required, StringLength(120)] public string Nome { get; set; } = "";
     [StringLength(80)] public string? Cidade { get; set; }
-    [StringLength(2)] public string? Uf { get; set; }
+    [Display(Name = "UF"), StringLength(2)] public string? Uf { get; set; }
     public bool ImpressoraHabilitada { get; set; }
     public bool Ativa { get; set; } = true;
     public ICollection<Usuario> Usuarios { get; set; } = new List<Usuario>();
@@ -40,10 +41,10 @@ public class Usuario
     public int FilialId { get; set; }
     public Filial? Filial { get; set; }
     [Required, StringLength(120)] public string Nome { get; set; } = "";
-    [Required, StringLength(160), EmailAddress] public string Email { get; set; } = "";
+    [Display(Name = "E-mail"), Required, StringLength(160), EmailAddress] public string Email { get; set; } = "";
     public string SenhaHash { get; set; } = "";
     public PerfilUsuario Perfil { get; set; } = PerfilUsuario.Atendente;
-    [StringLength(80)] public string? LocalAtual { get; set; }
+    [Display(Name = "Local atual"), StringLength(80)] public string? LocalAtual { get; set; }
     public bool Ativo { get; set; } = true;
 }
 
@@ -54,7 +55,7 @@ public class Tela
     [Required, StringLength(120)] public string Nome { get; set; } = "";
     [StringLength(40)] public string? Apelido { get; set; }
     public TipoTela Tipo { get; set; } = TipoTela.TvHorizontal;
-    [StringLength(60)] public string? Predio { get; set; }
+    [Display(Name = "Prédio"), StringLength(60)] public string? Predio { get; set; }
     [StringLength(60)] public string? Andar { get; set; }
     [StringLength(20)] public string? Ramal { get; set; }
     [StringLength(9)] public string? Cor { get; set; } = "#4C5BF5";
@@ -76,7 +77,7 @@ public class SalaEspera
 public class PontoAtendimento
 {
     public int Id { get; set; }
-    public int SalaEsperaId { get; set; }
+    [Display(Name = "Sala de espera")] public int SalaEsperaId { get; set; }
     [Required, StringLength(80)] public string Nome { get; set; } = "";
     public bool Ativo { get; set; } = true;
 }
@@ -87,7 +88,7 @@ public class Sala
     public int FilialId { get; set; }
     [Required, StringLength(120)] public string Nome { get; set; } = "";
     [StringLength(40)] public string? Apelido { get; set; }
-    [StringLength(60)] public string? Predio { get; set; }
+    [Display(Name = "Prédio"), StringLength(60)] public string? Predio { get; set; }
     [StringLength(60)] public string? Andar { get; set; }
     [StringLength(20)] public string? Ramal { get; set; }
     [StringLength(9)] public string? Cor { get; set; } = "#4C5BF5";
@@ -117,7 +118,7 @@ public class Senha
     [StringLength(80)] public string? LocalAtual { get; set; }
     [StringLength(80)] public string? PontoAtendimento { get; set; }
     public int? SalaId { get; set; }
-    public DateTime CriadaEm { get; set; } = DateTime.Now;
+    public DateTime CriadaEm { get; set; } = DataHora.Agora();
     public DateTime? ChamadaEm { get; set; }
     public DateTime? ConcluidaEm { get; set; }
 }

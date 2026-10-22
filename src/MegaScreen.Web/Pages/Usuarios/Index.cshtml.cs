@@ -4,6 +4,7 @@ using MegaScreen.Web.Data;
 using MegaScreen.Web.Infrastructure;
 using MegaScreen.Web.Models;
 using MegaScreen.Web.Services;
+using Microsoft.Data.SqlClient;
 
 namespace MegaScreen.Web.Pages.Usuarios;
 
@@ -24,14 +25,22 @@ public class IndexModel(AppRepository repository) : PageModel
     public async Task<IActionResult> OnPostSaveAsync()
     {
         var fid=User.FilialId(); Item.FilialId=fid;
-        if(string.IsNullOrWhiteSpace(Item.Nome) || string.IsNullOrWhiteSpace(Item.Email))
-            ModelState.AddModelError("", "Nome e e-mail são obrigatórios.");
         if(Item.Id==0 && string.IsNullOrWhiteSpace(NovaSenha))
             ModelState.AddModelError(nameof(NovaSenha), "Informe a senha inicial.");
         if(!string.IsNullOrWhiteSpace(NovaSenha) && NovaSenha.Length<8)
             ModelState.AddModelError(nameof(NovaSenha), "A senha deve ter ao menos 8 caracteres.");
         if(!ModelState.IsValid) { await OnGetAsync(Item.Id==0?null:Item.Id); return Page(); }
-        await repository.SalvarUsuarioAsync(Item, string.IsNullOrWhiteSpace(NovaSenha)?null:PasswordHasher.Hash(NovaSenha));
+        Item.Email=Item.Email.Trim().ToLowerInvariant();
+        try
+        {
+            await repository.SalvarUsuarioAsync(Item, string.IsNullOrWhiteSpace(NovaSenha)?null:PasswordHasher.Hash(NovaSenha));
+        }
+        catch(SqlException ex) when (ex.Number is 2601 or 2627)
+        {
+            ModelState.AddModelError("Item.Email", "Já existe um usuário com este e-mail.");
+            await OnGetAsync(Item.Id==0?null:Item.Id);
+            return Page();
+        }
         TempData["Toast"]="Usuário salvo.";
         return RedirectToPage();
     }

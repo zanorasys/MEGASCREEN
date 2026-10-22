@@ -19,7 +19,7 @@
             </div>
         </div>
         <div class="prof-side">
-            <div class="prof-room"><label>Sala de atendimento</label><select id="profRoom">@foreach (var s in Model.Salas) { <option>@s.Nome — @s.Predio · @s.Andar · R.@s.Ramal</option> }</select></div>
+            <div class="prof-room"><label>Sala de atendimento</label><select id="profRoom">@foreach (var s in Model.Salas) { <option value="@s.Id" data-nome="@s.Nome">@s.Nome — @s.Predio · @s.Andar · R.@s.Ramal</option> }</select></div>
             <div class="card"><div class="card-head"><h2>Fila</h2><span class="rt"><span class="dot"></span>Ao vivo</span></div><div class="next-list" id="profNext"></div></div>
         </div>
     </div>
@@ -29,16 +29,25 @@
     const filialId=@Model.FilialId;
     let fila=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Fila));
     const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const sel=()=>profRoom.options[profRoom.selectedIndex];
+    const salaNome=()=>sel()?.dataset.nome||'';
+    // Lembra a sala escolhida neste navegador.
+    try{const salva=localStorage.getItem('megaSalaProf');if(salva&&[...profRoom.options].some(o=>o.value===salva))profRoom.value=salva;}catch{}
+    profRoom.onchange=()=>{try{localStorage.setItem('megaSalaProf',profRoom.value);}catch{}render();};
+    // Paciente em atendimento NESTA sala (não o primeiro da filial).
+    const atual=()=>fila.find(q=>q.status==='EmAtendimento'&&(q.ponto||'')===salaNome());
+    async function post(url){try{const r=await fetch(url,{method:'POST'});if(r.ok)return;let m='Não foi possível concluir a ação.';try{const j=await r.json();if(j&&j.erro)m=j.erro;}catch{}if(r.status===401)m='Sua sessão expirou. Faça login novamente.';alert(m);}catch{alert('Sem conexão com o servidor.');}}
     function render(){
-        const a=fila.find(q=>q.status==='EmAtendimento');
+        const a=atual();
         profSenha.textContent=a?a.codigo:'—'; profNome.textContent=a?(a.nome||'—'):'Nenhum paciente';
         profTags.innerHTML=a?`<span>${esc(a.modalidade)}</span>${a.prioridade!=='Normal'?`<span class="pri">${a.prioridade}</span>`:''}`:'';
         const nxt=fila.filter(q=>q.status==='Aguardando').slice(0,4);
         profNext.innerHTML=nxt.length?nxt.map((q,i)=>`<div class="next-item"><div class="o">${String(i+1).padStart(2,'0')}</div><span class="s">${q.codigo}</span><div class="nm2">${esc(q.nome||'—')}<small>${esc(q.modalidade)}</small></div></div>`).join(''):'<div class="next-empty">Fila vazia.</div>';
     }
-    async function chamarProximo(){const n=fila.find(q=>q.status==='Aguardando');if(!n)return;await fetch(`/api/senhas/chamar/${n.id}?ponto=${encodeURIComponent(profRoom.value)}`,{method:'POST'});}
-    async function rechamar(){const a=fila.find(q=>q.status==='EmAtendimento');if(!a)return;await fetch(`/api/senhas/rechamar/${a.id}`,{method:'POST'});} async function concluir(){const a=fila.find(q=>q.status==='EmAtendimento');if(!a)return;await fetch(`/api/senhas/concluir/${a.id}`,{method:'POST'});}
-    async function naoCompareceu(){const a=fila.find(q=>q.status==='EmAtendimento');if(!a)return;await fetch(`/api/senhas/status/${a.id}/4`,{method:'POST'});}
+    async function chamarProximo(){if(!sel()){alert('Cadastre uma sala em Configuração > Salas.');return;}const n=fila.find(q=>q.status==='Aguardando');if(!n)return;await post(`/api/senhas/chamar/${n.id}?ponto=${encodeURIComponent(salaNome())}&salaId=${encodeURIComponent(profRoom.value)}`);}
+    async function rechamar(){const a=atual();if(!a)return;await post(`/api/senhas/rechamar/${a.id}`);}
+    async function concluir(){const a=atual();if(!a)return;await post(`/api/senhas/concluir/${a.id}`);}
+    async function naoCompareceu(){const a=atual();if(!a)return;await post(`/api/senhas/status/${a.id}/4`);}
     profCall.onclick=chamarProximo; profRecall.onclick=rechamar; profDone.onclick=concluir; profMiss.onclick=naoCompareceu;
     const conn=new signalR.HubConnectionBuilder().withUrl('/hubs/senha').withAutomaticReconnect().build();
     conn.on('FilaAtualizada',f=>{fila=f;render();});

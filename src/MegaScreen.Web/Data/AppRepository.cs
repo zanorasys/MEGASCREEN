@@ -1,4 +1,5 @@
 using Dapper;
+using MegaScreen.Web.Infrastructure;
 using MegaScreen.Web.Models;
 
 namespace MegaScreen.Web.Data;
@@ -11,8 +12,11 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
     {
         using var db = Open();
         return await db.QueryFirstOrDefaultAsync<Usuario>("""
-            SELECT TOP (1) Id, FilialId, Nome, Email, SenhaHash, Perfil, LocalAtual, Ativo
-            FROM Usuarios WHERE Email = @email AND Ativo = 1;
+            SELECT TOP (1) u.Id, u.FilialId, u.Nome, u.Email, u.SenhaHash, u.Perfil, u.LocalAtual, u.Ativo
+            FROM Usuarios u
+            INNER JOIN Filiais f ON f.Id = u.FilialId AND f.Ativa = 1
+            INNER JOIN Clientes c ON c.Id = f.ClienteId AND c.Ativo = 1
+            WHERE u.Email = @email AND u.Ativo = 1;
             """, new { email });
     }
 
@@ -231,10 +235,12 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
                 """,item);
     }
 
-    public async Task ExcluirSalaAsync(int id,int filialId)
+    /// <summary>Exclui a sala. Retorna false se ela já foi usada em senhas (FK) e por isso não pôde ser removida.</summary>
+    public async Task<bool> ExcluirSalaAsync(int id,int filialId)
     {
         using var db = Open();
-        await db.ExecuteAsync("DELETE FROM Salas WHERE Id=@id AND FilialId=@filialId AND NOT EXISTS(SELECT 1 FROM Senhas WHERE SalaId=@id);",new { id,filialId });
+        var linhas = await db.ExecuteAsync("DELETE FROM Salas WHERE Id=@id AND FilialId=@filialId AND NOT EXISTS(SELECT 1 FROM Senhas WHERE SalaId=@id);",new { id,filialId });
+        return linhas > 0;
     }
 
     public async Task<List<Tela>> ListarTelasAsync(int filialId)
@@ -358,34 +364,42 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
             USING (SELECT @FilialId AS FilialId) AS src ON target.FilialId=src.FilialId
             WHEN MATCHED THEN UPDATE SET CorFundo=@CorFundo,CorTexto=@CorTexto,CorDestaque=@CorDestaque,
                 Fonte=@Fonte,MostrarHorario=@MostrarHorario,MostrarNumero=@MostrarNumero,MostrarOrdem=@MostrarOrdem,
-                MostrarSala=@MostrarSala,LogoUrl=@LogoUrl,FundoUrl=@FundoUrl,VideoUrl=@VideoUrl,Marca=@Marca
+                MostrarSala=@MostrarSala,LogoUrl=@LogoUrl,FundoUrl=@FundoUrl,VideoUrl=@VideoUrl,Marca=@Marca,
+                AtualizadoEm=@AtualizadoEm
             WHEN NOT MATCHED THEN INSERT
-                (FilialId,CorFundo,CorTexto,CorDestaque,Fonte,MostrarHorario,MostrarNumero,MostrarOrdem,MostrarSala,LogoUrl,FundoUrl,VideoUrl,Marca)
-                VALUES (@FilialId,@CorFundo,@CorTexto,@CorDestaque,@Fonte,@MostrarHorario,@MostrarNumero,@MostrarOrdem,@MostrarSala,@LogoUrl,@FundoUrl,@VideoUrl,@Marca);
-            """,p);
+                (FilialId,CorFundo,CorTexto,CorDestaque,Fonte,MostrarHorario,MostrarNumero,MostrarOrdem,MostrarSala,LogoUrl,FundoUrl,VideoUrl,Marca,AtualizadoEm)
+                VALUES (@FilialId,@CorFundo,@CorTexto,@CorDestaque,@Fonte,@MostrarHorario,@MostrarNumero,@MostrarOrdem,@MostrarSala,@LogoUrl,@FundoUrl,@VideoUrl,@Marca,@AtualizadoEm);
+            """,new
+            {
+                p.FilialId,p.CorFundo,p.CorTexto,p.CorDestaque,p.Fonte,p.MostrarHorario,p.MostrarNumero,p.MostrarOrdem,p.MostrarSala,
+                p.LogoUrl,p.FundoUrl,p.VideoUrl,p.Marca,
+                AtualizadoEm=DataHora.Agora()
+            });
     }
 
     public async Task<DashboardStats> ObterDashboardAsync(int filialId)
     {
         using var db=Open();
+        var hoje=DataHora.Hoje();
         return await db.QuerySingleAsync<DashboardStats>("""
             SELECT
-              SUM(CASE WHEN Status=@Aguardando THEN 1 ELSE 0 END) Aguardando,
-              SUM(CASE WHEN Status=@EmAtendimento THEN 1 ELSE 0 END) EmAtendimento,
-              SUM(CASE WHEN Status=@Concluida AND CAST(ConcluidaEm AS date)=CAST(GETDATE() AS date) THEN 1 ELSE 0 END) ConcluidosHoje,
-              ISNULL(AVG(CASE WHEN ChamadaEm IS NOT NULL AND CAST(CriadaEm AS date)=CAST(GETDATE() AS date)
+              ISNULL(SUM(CASE WHEN Status=@Aguardando AND CriadaEm>=@hoje AND CriadaEm<@amanha THEN 1 ELSE 0 END),0) Aguardando,
+              ISNULL(SUM(CASE WHEN Status=@EmAtendimento AND CriadaEm>=@hoje AND CriadaEm<@amanha THEN 1 ELSE 0 END),0) EmAtendimento,
+              ISNULL(SUM(CASE WHEN Status=@Concluida AND ConcluidaEm>=@hoje AND ConcluidaEm<@amanha THEN 1 ELSE 0 END),0) ConcluidosHoje,
+              ISNULL(AVG(CASE WHEN ChamadaEm IS NOT NULL AND CriadaEm>=@hoje AND CriadaEm<@amanha
                     THEN DATEDIFF(second,CriadaEm,ChamadaEm) END),0) EsperaMediaSegundos
             FROM Senhas WHERE FilialId=@filialId;
-            """,new { filialId,Aguardando=(int)StatusSenha.Aguardando,EmAtendimento=(int)StatusSenha.EmAtendimento,Concluida=(int)StatusSenha.Concluida });
+            """,new { filialId,hoje,amanha=hoje.AddDays(1),Aguardando=(int)StatusSenha.Aguardando,EmAtendimento=(int)StatusSenha.EmAtendimento,Concluida=(int)StatusSenha.Concluida });
     }
 
     public async Task CriarTokenRecuperacaoAsync(int usuarioId,string tokenHash,DateTime expiraEm)
     {
         using var db=Open();
+        // Invalida tokens anteriores ainda não usados e cria o novo (hora de São Paulo).
         await db.ExecuteAsync("""
-            UPDATE PasswordResetTokens SET UsadoEm=GETDATE() WHERE UsuarioId=@usuarioId AND UsadoEm IS NULL;
-            INSERT INTO PasswordResetTokens (UsuarioId,TokenHash,ExpiraEm) VALUES (@usuarioId,@tokenHash,@expiraEm);
-            """,new { usuarioId,tokenHash,expiraEm });
+            UPDATE PasswordResetTokens SET UtilizadoEm=@agora WHERE UsuarioId=@usuarioId AND UtilizadoEm IS NULL;
+            INSERT INTO PasswordResetTokens (UsuarioId,TokenHash,ExpiraEm,CriadoEm) VALUES (@usuarioId,@tokenHash,@expiraEm,@agora);
+            """,new { usuarioId,tokenHash,expiraEm,agora=DataHora.Agora() });
     }
 
     public async Task<Usuario?> ObterUsuarioPorTokenRecuperacaoAsync(string tokenHash)
@@ -394,8 +408,8 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
         return await db.QueryFirstOrDefaultAsync<Usuario>("""
             SELECT u.Id,u.FilialId,u.Nome,u.Email,u.SenhaHash,u.Perfil,u.LocalAtual,u.Ativo
             FROM PasswordResetTokens t INNER JOIN Usuarios u ON u.Id=t.UsuarioId
-            WHERE t.TokenHash=@tokenHash AND t.UsadoEm IS NULL AND t.ExpiraEm>GETDATE() AND u.Ativo=1;
-            """,new { tokenHash });
+            WHERE t.TokenHash=@tokenHash AND t.UtilizadoEm IS NULL AND t.ExpiraEm>@agora AND u.Ativo=1;
+            """,new { tokenHash,agora=DataHora.Agora() });
     }
 
     public async Task ConsumirTokenRecuperacaoAsync(string tokenHash,int usuarioId,string senhaHash)
@@ -404,7 +418,7 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
         db.Open();
         using var tx=db.BeginTransaction();
         await db.ExecuteAsync("UPDATE Usuarios SET SenhaHash=@senhaHash WHERE Id=@usuarioId;",new { usuarioId,senhaHash },tx);
-        await db.ExecuteAsync("UPDATE PasswordResetTokens SET UsadoEm=GETDATE() WHERE TokenHash=@tokenHash AND UsuarioId=@usuarioId;",new { tokenHash,usuarioId },tx);
+        await db.ExecuteAsync("UPDATE PasswordResetTokens SET UtilizadoEm=@agora WHERE TokenHash=@tokenHash AND UsuarioId=@usuarioId;",new { tokenHash,usuarioId,agora=DataHora.Agora() },tx);
         tx.Commit();
     }
 

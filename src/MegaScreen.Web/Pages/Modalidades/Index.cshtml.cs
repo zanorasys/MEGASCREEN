@@ -20,7 +20,6 @@ public class IndexModel(AppRepository repository) : PageModel
     public async Task<IActionResult> OnPostSaveAsync()
     {
         Item.FilialId=User.FilialId();
-        if(string.IsNullOrWhiteSpace(Item.Nome)||string.IsNullOrWhiteSpace(Item.Prefixo)) ModelState.AddModelError("","Nome e prefixo são obrigatórios.");
         if(!ModelState.IsValid){await OnGetAsync(Item.Id==0?null:Item.Id);return Page();}
         await repository.SalvarModalidadeAsync(Item); TempData["Toast"]="Modalidade salva."; return RedirectToPage();
     }

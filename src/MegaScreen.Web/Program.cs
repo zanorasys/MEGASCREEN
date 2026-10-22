@@ -1,6 +1,10 @@
+using System.Globalization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Localization;
 using MegaScreen.Web.Data;
 using MegaScreen.Web.Hubs;
+using MegaScreen.Web.Infrastructure;
 using MegaScreen.Web.Models;
 using MegaScreen.Web.Services;
 
@@ -9,17 +13,24 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/");
-    options.Conventions.AllowAnonymousToFolder("/Account");
+    // Libera somente as páginas públicas de conta. Não usar AllowAnonymousToFolder("/Account"):
+    // o AllowAnonymous anula o [Authorize(Roles="Admin")] do SwitchFilial e do Perfil.
+    options.Conventions.AllowAnonymousToPage("/Account/Login");
+    options.Conventions.AllowAnonymousToPage("/Account/EsqueciSenha");
+    options.Conventions.AllowAnonymousToPage("/Account/RedefinirSenha");
+    options.Conventions.AllowAnonymousToPage("/Account/Logout");
+    options.Conventions.AllowAnonymousToPage("/Account/AcessoNegado");
     options.Conventions.AllowAnonymousToPage("/Public/Tv");
     options.Conventions.AllowAnonymousToPage("/Public/Totem");
     options.Conventions.AllowAnonymousToPage("/Error");
     options.Conventions.AuthorizeFolder("/Clientes", "AdminOnly");
     options.Conventions.AuthorizeFolder("/Filiais", "AdminOnly");
-});
+    options.Conventions.AuthorizePage("/Account/SwitchFilial", "AdminOnly");
+}).AddMvcOptions(ValidacaoPtBr.Configurar);
+
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<AppRepository>();
-builder.Services.AddScoped<DatabaseInitializer>();
 builder.Services.AddScoped<SenhaService>();
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
@@ -29,9 +40,24 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     {
         opt.LoginPath = "/Account/Login";
         opt.LogoutPath = "/Account/Logout";
-        opt.AccessDeniedPath = "/Account/Login";
+        opt.AccessDeniedPath = "/Account/AcessoNegado";
         opt.ExpireTimeSpan = TimeSpan.FromHours(8);
         opt.SlidingExpiration = true;
+        opt.Cookie.HttpOnly = true;
+        opt.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        // Na API devolve 401/403 em vez de redirecionar para a tela de login.
+        opt.Events.OnRedirectToLogin = ctx =>
+        {
+            if (ctx.Request.Path.StartsWithSegments("/api")) ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            else ctx.Response.Redirect(ctx.RedirectUri);
+            return Task.CompletedTask;
+        };
+        opt.Events.OnRedirectToAccessDenied = ctx =>
+        {
+            if (ctx.Request.Path.StartsWithSegments("/api")) ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+            else ctx.Response.Redirect(ctx.RedirectUri);
+            return Task.CompletedTask;
+        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -39,71 +65,91 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminOnly", p => p.RequireRole("Admin"));
 });
 
+// Totem é público: limita emissão de senhas por IP para evitar abuso.
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.AddPolicy("emitir", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
+
 var app = builder.Build();
+
+var ptBr = new CultureInfo("pt-BR");
+app.UseRequestLocalization(new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new RequestCulture(ptBr),
+    SupportedCultures = [ptBr],
+    SupportedUICultures = [ptBr]
+});
 
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+app.UseWhen(ctx => !ctx.Request.Path.StartsWithSegments("/api"),
+    b => b.UseStatusCodePagesWithReExecute("/Error"));
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapRazorPages();
 app.MapHub<SenhaHub>("/hubs/senha");
 
 var api = app.MapGroup("/api/senhas");
 
-api.MapGet("/fila/{filialId:int}", async (int filialId, SenhaService svc) =>
-    Results.Json((await svc.FilaAsync(filialId)).Select(SenhaDto.From)));
+// Executa a ação e converte erros de regra de negócio em mensagem PT-BR para o front.
+static async Task<IResult> Executar(Func<Task> acao)
+{
+    try { await acao(); return Results.Ok(); }
+    catch (RegraNegocioException ex) { return Results.Json(new { erro = ex.Message }, statusCode: StatusCodes.Status409Conflict); }
+}
+
+api.MapGet("/fila", async (HttpContext http, SenhaService svc) =>
+    Results.Json((await svc.FilaAsync(http.User.FilialId())).Select(SenhaDto.From)))
+    .RequireAuthorization();
 
 api.MapPost("/emitir/{filialId:int}", async (int filialId, NovaSenhaViewModel vm, SenhaService svc) =>
 {
     if (vm.ModalidadeId <= 0 || !Enum.IsDefined(typeof(Prioridade), vm.Prioridade))
         return Results.BadRequest(new { erro = "Dados da senha inválidos." });
-    var senha = await svc.EmitirAsync(filialId, vm);
-    return Results.Json(SenhaDto.From(senha));
-}).AllowAnonymous();
+    try
+    {
+        var senha = await svc.EmitirAsync(filialId, vm);
+        return Results.Json(SenhaDto.From(senha));
+    }
+    catch (RegraNegocioException ex) { return Results.BadRequest(new { erro = ex.Message }); }
+}).AllowAnonymous().RequireRateLimiting("emitir");
 
-api.MapPost("/chamar/{id:int}", async (int id, string? ponto, SenhaService svc) =>
-{
-    await svc.ChamarAsync(id, string.IsNullOrWhiteSpace(ponto) ? "Guichê" : ponto);
-    return Results.Ok();
-}).RequireAuthorization();
+api.MapPost("/chamar/{id:int}", (int id, string? ponto, int? salaId, HttpContext http, SenhaService svc) =>
+    Executar(() => svc.ChamarAsync(http.User.FilialId(), id,
+        string.IsNullOrWhiteSpace(ponto) ? "Guichê" : ponto.Trim(), salaId)))
+    .RequireAuthorization();
 
-api.MapPost("/rechamar/{id:int}", async (int id, SenhaService svc) =>
-{
-    await svc.RechamarAsync(id);
-    return Results.Ok();
-}).RequireAuthorization();
+api.MapPost("/rechamar/{id:int}", (int id, HttpContext http, SenhaService svc) =>
+    Executar(() => svc.RechamarAsync(http.User.FilialId(), id)))
+    .RequireAuthorization();
 
-api.MapPost("/mover/{id:int}", async (int id, string destino, SenhaService svc) =>
-{
-    await svc.MoverAsync(id, destino);
-    return Results.Ok();
-}).RequireAuthorization();
+api.MapPost("/mover/{id:int}", (int id, string? destino, HttpContext http, SenhaService svc) =>
+    string.IsNullOrWhiteSpace(destino)
+        ? Task.FromResult(Results.BadRequest(new { erro = "Informe o destino." }))
+        : Executar(() => svc.MoverAsync(http.User.FilialId(), id, destino.Trim())))
+    .RequireAuthorization();
 
-api.MapPost("/concluir/{id:int}", async (int id, SenhaService svc) =>
-{
-    await svc.ConcluirAsync(id);
-    return Results.Ok();
-}).RequireAuthorization();
+api.MapPost("/concluir/{id:int}", (int id, HttpContext http, SenhaService svc) =>
+    Executar(() => svc.ConcluirAsync(http.User.FilialId(), id)))
+    .RequireAuthorization();
 
-api.MapPost("/status/{id:int}/{status:int}", async (int id, int status, SenhaService svc) =>
-{
-    if (!Enum.IsDefined(typeof(StatusSenha), status)) return Results.BadRequest();
-    await svc.AtualizarStatusAsync(id, (StatusSenha)status);
-    return Results.Ok();
-}).RequireAuthorization();
-
-using (var scope = app.Services.CreateScope())
-{
-    var initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
-    await initializer.InitializeAsync();
-}
+api.MapPost("/status/{id:int}/{status:int}", (int id, int status, HttpContext http, SenhaService svc) =>
+    !Enum.IsDefined(typeof(StatusSenha), status)
+        ? Task.FromResult(Results.BadRequest(new { erro = "Status inválido." }))
+        : Executar(() => svc.AtualizarStatusAsync(http.User.FilialId(), id, (StatusSenha)status)))
+    .RequireAuthorization();
 
 app.Run();

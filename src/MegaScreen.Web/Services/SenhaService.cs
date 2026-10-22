@@ -1,70 +1,106 @@
+using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.SignalR;
 using MegaScreen.Web.Data;
 using MegaScreen.Web.Hubs;
+using MegaScreen.Web.Infrastructure;
 using MegaScreen.Web.Models;
 
 namespace MegaScreen.Web.Services;
 
+/// <summary>Erro de regra de negócio com mensagem pronta para o usuário (PT-BR).</summary>
+public sealed class RegraNegocioException(string mensagem) : Exception(mensagem);
+
 public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<SenhaHub> hub)
 {
+    private const string ColunasSenha = """
+        s.Id, s.FilialId, s.ModalidadeId, s.Codigo, s.Nome, s.Prioridade, s.Status,
+               s.LocalAtual, s.PontoAtendimento, s.SalaId, s.CriadaEm, s.ChamadaEm, s.ConcluidaEm,
+               m.Id, m.FilialId, m.Nome, m.Prefixo, m.PrioridadeInterna, m.Ativa, m.Contador
+        FROM Senhas s
+        INNER JOIN Modalidades m ON m.Id = s.ModalidadeId
+        """;
+
+    private const string SelectSenhaComModalidade = "SELECT " + ColunasSenha;
+
+    private static Senha Mapear(Senha senha, Modalidade modalidade)
+    {
+        senha.Modalidade = modalidade;
+        return senha;
+    }
+
+    /// <summary>Fila do dia (hora de São Paulo): aguardando + em atendimento.
+    /// Ordem: prioritários (idoso/PcD) primeiro, depois prioridade interna da modalidade, depois ordem de chegada.</summary>
     public async Task<List<Senha>> FilaAsync(int filialId)
     {
-        const string sql = """
-            SELECT s.Id, s.FilialId, s.ModalidadeId, s.Codigo, s.Nome, s.Prioridade, s.Status,
-                   s.LocalAtual, s.PontoAtendimento, s.SalaId, s.CriadaEm, s.ChamadaEm, s.ConcluidaEm,
-                   m.Id, m.FilialId, m.Nome, m.Prefixo, m.PrioridadeInterna, m.Ativa, m.Contador
-            FROM Senhas s
-            INNER JOIN Modalidades m ON m.Id = s.ModalidadeId
+        var sql = SelectSenhaComModalidade + """
+
             WHERE s.FilialId = @filialId
               AND s.Status IN (@aguardando, @emAtendimento)
-            ORDER BY CASE WHEN s.Prioridade = @normal THEN 1 ELSE 0 END, s.CriadaEm;
+              AND s.CriadaEm >= @hoje AND s.CriadaEm < @amanha
+            ORDER BY CASE WHEN s.Prioridade = @normal THEN 1 ELSE 0 END,
+                     m.PrioridadeInterna DESC,
+                     s.CriadaEm;
             """;
-
+        var hoje = DataHora.Hoje();
         using var db = connectionFactory.CreateConnection();
-        var result = await db.QueryAsync<Senha, Modalidade, Senha>(
-            sql,
-            (senha, modalidade) =>
-            {
-                senha.Modalidade = modalidade;
-                return senha;
-            },
-            new
-            {
-                filialId,
-                aguardando = (int)StatusSenha.Aguardando,
-                emAtendimento = (int)StatusSenha.EmAtendimento,
-                normal = (int)Prioridade.Normal
-            },
-            splitOn: "Id");
+        var result = await db.QueryAsync<Senha, Modalidade, Senha>(sql, Mapear, new
+        {
+            filialId,
+            aguardando = (int)StatusSenha.Aguardando,
+            emAtendimento = (int)StatusSenha.EmAtendimento,
+            normal = (int)Prioridade.Normal,
+            hoje,
+            amanha = hoje.AddDays(1)
+        }, splitOn: "Id");
+        return result.ToList();
+    }
 
+    /// <summary>Últimas senhas chamadas hoje (mais recente primeiro), usado na lateral da TV.</summary>
+    public async Task<List<Senha>> UltimasChamadasAsync(int filialId, int quantidade = 5)
+    {
+        var sql = "SELECT TOP (@quantidade) " + ColunasSenha + """
+
+            WHERE s.FilialId = @filialId
+              AND s.ChamadaEm IS NOT NULL
+              AND s.ChamadaEm >= @hoje AND s.ChamadaEm < @amanha
+            ORDER BY s.ChamadaEm DESC;
+            """;
+        var hoje = DataHora.Hoje();
+        using var db = connectionFactory.CreateConnection();
+        var result = await db.QueryAsync<Senha, Modalidade, Senha>(sql, Mapear,
+            new { filialId, quantidade, hoje, amanha = hoje.AddDays(1) }, splitOn: "Id");
         return result.ToList();
     }
 
     public async Task<Senha> EmitirAsync(int filialId, NovaSenhaViewModel vm)
     {
+        var agora = DataHora.Agora();
         using var db = connectionFactory.CreateConnection();
         db.Open();
         using var tx = db.BeginTransaction();
 
-        const string incrementSql = """
-            UPDATE Modalidades WITH (UPDLOCK, ROWLOCK)
-            SET Contador = Contador + 1
-            OUTPUT INSERTED.Id, INSERTED.FilialId, INSERTED.Nome, INSERTED.Prefixo,
-                   INSERTED.PrioridadeInterna, INSERTED.Ativa, INSERTED.Contador
+        var modalidade = await db.QuerySingleOrDefaultAsync<Modalidade>("""
+            SELECT Id, FilialId, Nome, Prefixo, PrioridadeInterna, Ativa, Contador
+            FROM Modalidades
             WHERE Id = @modalidadeId AND FilialId = @filialId AND Ativa = 1;
-            """;
+            """, new { modalidadeId = vm.ModalidadeId, filialId }, tx)
+            ?? throw new RegraNegocioException("Modalidade não encontrada ou inativa.");
 
-        var modalidade = await db.QuerySingleOrDefaultAsync<Modalidade>(
-            incrementSql, new { modalidadeId = vm.ModalidadeId, filialId }, tx);
+        // Numeração diária por filial + modalidade (procedure usp_Senha_ProximoNumero / tabela SenhaSequencia).
+        var p = new DynamicParameters();
+        p.Add("@FilialId", (long)filialId, DbType.Int64);
+        p.Add("@ModalidadeId", (long)modalidade.Id, DbType.Int64);
+        p.Add("@DataReferencia", agora.Date, DbType.Date);
+        p.Add("@Code", Guid.NewGuid(), DbType.Guid);
+        p.Add("@Agora", agora, DbType.DateTime2);
+        p.Add("@ProximoNumero", dbType: DbType.Int32, direction: ParameterDirection.Output);
+        await db.ExecuteAsync("dbo.usp_Senha_ProximoNumero", p, tx, commandType: CommandType.StoredProcedure);
+        var numero = p.Get<int>("@ProximoNumero");
 
-        if (modalidade is null)
-            throw new InvalidOperationException("Modalidade não encontrada ou inativa.");
+        var codigo = $"{modalidade.Prefixo}{numero:D3}";
 
-        var criadaEm = DateTime.Now;
-        var codigo = $"{modalidade.Prefixo}{modalidade.Contador:D3}";
-
-        const string insertSql = """
+        var senha = await db.QuerySingleAsync<Senha>("""
             INSERT INTO Senhas
                 (FilialId, ModalidadeId, Codigo, Nome, Prioridade, Status, CriadaEm)
             OUTPUT INSERTED.Id, INSERTED.FilialId, INSERTED.ModalidadeId, INSERTED.Codigo,
@@ -73,17 +109,15 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
                    INSERTED.ChamadaEm, INSERTED.ConcluidaEm
             VALUES
                 (@FilialId, @ModalidadeId, @Codigo, @Nome, @Prioridade, @Status, @CriadaEm);
-            """;
-
-        var senha = await db.QuerySingleAsync<Senha>(insertSql, new
+            """, new
         {
             FilialId = filialId,
             ModalidadeId = modalidade.Id,
             Codigo = codigo,
-            vm.Nome,
+            Nome = string.IsNullOrWhiteSpace(vm.Nome) ? null : vm.Nome.Trim(),
             Prioridade = (int)vm.Prioridade,
             Status = (int)StatusSenha.Aguardando,
-            CriadaEm = criadaEm
+            CriadaEm = agora
         }, tx);
 
         senha.Modalidade = modalidade;
@@ -93,114 +127,115 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
         return senha;
     }
 
-    public async Task ChamarAsync(int senhaId, string ponto)
+    /// <summary>Chama a senha somente se ela ainda estiver aguardando (evita dois guichês chamarem a mesma).</summary>
+    public async Task ChamarAsync(int filialId, int senhaId, string ponto, int? salaId = null)
     {
         using var db = connectionFactory.CreateConnection();
-        const string updateSql = """
+        var linhas = await db.ExecuteAsync("""
             UPDATE Senhas
-            SET Status = @status, PontoAtendimento = @ponto, ChamadaEm = @chamadaEm
-            WHERE Id = @senhaId;
-            """;
-        await db.ExecuteAsync(updateSql, new
+            SET Status = @emAtendimento,
+                PontoAtendimento = @ponto,
+                SalaId = (SELECT sa.Id FROM Salas sa WHERE sa.Id = @salaId AND sa.FilialId = @filialId),
+                ChamadaEm = @agora
+            WHERE Id = @senhaId AND FilialId = @filialId AND Status = @aguardando;
+            """, new
         {
             senhaId,
+            filialId,
             ponto,
-            status = (int)StatusSenha.EmAtendimento,
-            chamadaEm = DateTime.Now
+            salaId,
+            emAtendimento = (int)StatusSenha.EmAtendimento,
+            aguardando = (int)StatusSenha.Aguardando,
+            agora = DataHora.Agora()
         });
 
-        var senha = await ObterComModalidadeAsync(db, senhaId)
-            ?? throw new InvalidOperationException("Senha não encontrada.");
+        if (linhas == 0)
+            throw new RegraNegocioException("Esta senha não está mais aguardando. Talvez outro atendente já a tenha chamado.");
 
-        await hub.Clients.Group(Grupo(senha.FilialId)).SendAsync("SenhaChamada", SenhaDto.From(senha));
-        await Broadcast(senha.FilialId);
+        var senha = await ObterComModalidadeAsync(db, filialId, senhaId)
+            ?? throw new RegraNegocioException("Senha não encontrada.");
+
+        await hub.Clients.Group(Grupo(filialId)).SendAsync("SenhaChamada", SenhaDto.From(senha));
+        await Broadcast(filialId);
     }
 
-    public async Task ConcluirAsync(int senhaId)
+    public Task ConcluirAsync(int filialId, int senhaId) => AtualizarStatusAsync(filialId, senhaId, StatusSenha.Concluida);
+
+    public async Task AtualizarStatusAsync(int filialId, int senhaId, StatusSenha status)
     {
+        var finaliza = status is StatusSenha.Concluida or StatusSenha.NaoCompareceu or StatusSenha.Cancelada;
         using var db = connectionFactory.CreateConnection();
-        const string sql = """
+        var linhas = await db.ExecuteAsync("""
             UPDATE Senhas
-            SET Status = @status, ConcluidaEm = @concluidaEm
-            OUTPUT INSERTED.FilialId
-            WHERE Id = @senhaId;
-            """;
-        var filialId = await db.QuerySingleOrDefaultAsync<int?>(sql, new
+            SET Status = @status,
+                ConcluidaEm = CASE WHEN @finaliza = 1 THEN @agora ELSE ConcluidaEm END
+            WHERE Id = @senhaId AND FilialId = @filialId
+              AND Status IN (@aguardando, @emAtendimento);
+            """, new
         {
             senhaId,
-            status = (int)StatusSenha.Concluida,
-            concluidaEm = DateTime.Now
+            filialId,
+            status = (int)status,
+            finaliza,
+            agora = DataHora.Agora(),
+            aguardando = (int)StatusSenha.Aguardando,
+            emAtendimento = (int)StatusSenha.EmAtendimento
         });
-        if (filialId is null)
-            throw new InvalidOperationException("Senha não encontrada.");
+        if (linhas == 0)
+            throw new RegraNegocioException("Senha não encontrada ou já finalizada.");
 
-        await Broadcast(filialId.Value);
+        await Broadcast(filialId);
     }
 
-    public async Task AtualizarStatusAsync(int senhaId, StatusSenha status)
+    /// <summary>Rechama sem alterar ChamadaEm (para não distorcer a espera média).</summary>
+    public async Task RechamarAsync(int filialId, int senhaId)
     {
         using var db = connectionFactory.CreateConnection();
-        const string sql = """
-            UPDATE Senhas
-            SET Status = @status
-            OUTPUT INSERTED.FilialId
-            WHERE Id = @senhaId;
-            """;
-        var filialId = await db.QuerySingleOrDefaultAsync<int?>(sql, new { senhaId, status = (int)status });
-        if (filialId is null)
-            throw new InvalidOperationException("Senha não encontrada.");
+        var senha = await ObterComModalidadeAsync(db, filialId, senhaId)
+            ?? throw new RegraNegocioException("Senha não encontrada.");
+        if (senha.Status != StatusSenha.EmAtendimento)
+            throw new RegraNegocioException("Só é possível rechamar uma senha em atendimento.");
 
-        await Broadcast(filialId.Value);
+        await hub.Clients.Group(Grupo(filialId)).SendAsync("SenhaChamada", SenhaDto.From(senha));
+        await Broadcast(filialId);
     }
 
-
-    public async Task RechamarAsync(int senhaId)
+    public async Task MoverAsync(int filialId, int senhaId, string destino)
     {
         using var db = connectionFactory.CreateConnection();
-        var senha = await ObterComModalidadeAsync(db, senhaId)
-            ?? throw new InvalidOperationException("Senha não encontrada.");
-        await db.ExecuteAsync("UPDATE Senhas SET ChamadaEm=@agora WHERE Id=@senhaId;", new { senhaId, agora = DateTime.Now });
-        await hub.Clients.Group(Grupo(senha.FilialId)).SendAsync("SenhaChamada", SenhaDto.From(senha));
-        await Broadcast(senha.FilialId);
+        var linhas = await db.ExecuteAsync("""
+            UPDATE Senhas SET LocalAtual = @destino, PontoAtendimento = @destino
+            WHERE Id = @senhaId AND FilialId = @filialId
+              AND Status IN (@aguardando, @emAtendimento);
+            """, new
+        {
+            senhaId,
+            filialId,
+            destino,
+            aguardando = (int)StatusSenha.Aguardando,
+            emAtendimento = (int)StatusSenha.EmAtendimento
+        });
+        if (linhas == 0) throw new RegraNegocioException("Senha não encontrada ou já finalizada.");
+        await Broadcast(filialId);
     }
 
-    public async Task MoverAsync(int senhaId, string destino)
+    private static async Task<Senha?> ObterComModalidadeAsync(IDbConnection db, int filialId, int senhaId)
     {
-        using var db = connectionFactory.CreateConnection();
-        const string sql = """
-            UPDATE Senhas SET LocalAtual=@destino, PontoAtendimento=@destino
-            OUTPUT INSERTED.FilialId WHERE Id=@senhaId;
-            """;
-        var filialId = await db.QuerySingleOrDefaultAsync<int?>(sql, new { senhaId, destino });
-        if (filialId is null) throw new InvalidOperationException("Senha não encontrada.");
-        await Broadcast(filialId.Value);
-    }
+        var sql = SelectSenhaComModalidade + """
 
-    private static async Task<Senha?> ObterComModalidadeAsync(System.Data.IDbConnection db, int senhaId)
-    {
-        const string sql = """
-            SELECT s.Id, s.FilialId, s.ModalidadeId, s.Codigo, s.Nome, s.Prioridade, s.Status,
-                   s.LocalAtual, s.PontoAtendimento, s.SalaId, s.CriadaEm, s.ChamadaEm, s.ConcluidaEm,
-                   m.Id, m.FilialId, m.Nome, m.Prefixo, m.PrioridadeInterna, m.Ativa, m.Contador
-            FROM Senhas s
-            INNER JOIN Modalidades m ON m.Id = s.ModalidadeId
-            WHERE s.Id = @senhaId;
+            WHERE s.Id = @senhaId AND s.FilialId = @filialId;
             """;
-        return (await db.QueryAsync<Senha, Modalidade, Senha>(
-            sql,
-            (senha, modalidade) =>
-            {
-                senha.Modalidade = modalidade;
-                return senha;
-            },
-            new { senhaId },
-            splitOn: "Id")).FirstOrDefault();
+        return (await db.QueryAsync<Senha, Modalidade, Senha>(sql, Mapear, new { senhaId, filialId }, splitOn: "Id"))
+            .FirstOrDefault();
     }
 
     private async Task Broadcast(int filialId)
     {
         var fila = (await FilaAsync(filialId)).Select(SenhaDto.From).ToList();
-        await hub.Clients.Group(Grupo(filialId)).SendAsync("FilaAtualizada", fila);
+        var ultimas = (await UltimasChamadasAsync(filialId)).Select(SenhaDto.From).ToList();
+        var grupo = hub.Clients.Group(Grupo(filialId));
+        await grupo.SendAsync("FilaAtualizada", fila);
+        await grupo.SendAsync("UltimasChamadas", ultimas);
     }
 
     public static string Grupo(int filialId) => $"filial-{filialId}";

@@ -13,6 +13,6 @@ public class IndexModel(AppRepository repository) : PageModel
     public List<Cliente> Clientes { get; private set; }=new();
     [BindProperty] public Filial Item { get; set; }=new();
     public async Task OnGetAsync(int? edit){Itens=await repository.ListarFiliaisAsync();Clientes=await repository.ListarClientesAsync();Item=edit is >0?Itens.FirstOrDefault(x=>x.Id==edit)??new Filial():new Filial{Ativa=true};}
-    public async Task<IActionResult> OnPostSaveAsync(){if(string.IsNullOrWhiteSpace(Item.Nome)||Item.ClienteId<=0)ModelState.AddModelError("","Cliente e nome da filial são obrigatórios.");if(!ModelState.IsValid){await OnGetAsync(Item.Id==0?null:Item.Id);return Page();}Item.Uf=Item.Uf?.Trim().ToUpperInvariant();await repository.SalvarFilialAsync(Item);TempData["Toast"]="Filial salva.";return RedirectToPage();}
+    public async Task<IActionResult> OnPostSaveAsync(){if(Item.ClienteId<=0)ModelState.AddModelError("Item.ClienteId","Selecione o cliente.");if(!ModelState.IsValid){await OnGetAsync(Item.Id==0?null:Item.Id);return Page();}Item.Uf=Item.Uf?.Trim().ToUpperInvariant();await repository.SalvarFilialAsync(Item);TempData["Toast"]="Filial salva.";return RedirectToPage();}
     public async Task<IActionResult> OnPostDeleteAsync(int id){await repository.ExcluirFilialAsync(id);TempData["Toast"]="Filial desativada.";return RedirectToPage();}
 }
