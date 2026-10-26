@@ -451,3 +451,14 @@
 .bell-pop .bi span{margin-left:auto;color:var(--accent);font-weight:700}
 .bell-pop .vazio{color:var(--muted);font-size:13px}
 .tel-link{font-size:12px}
+
+/* ===== Ajustes: checkboxes em .field, toggles, formulários recolhíveis, menu da fila ===== */
+.field .check{display:flex;align-items:center;gap:8px;margin:0;font-size:13.5px;font-weight:600;color:var(--text);cursor:pointer}
+.field .check input[type=checkbox],.check input[type=checkbox]{width:16px;height:16px;padding:0;margin:0;flex:0 0 auto;accent-color:var(--primary);box-shadow:none;cursor:pointer}
+.field .check .hint{margin:0;font-weight:500}
+.check-list{display:flex;flex-direction:column;gap:10px;padding:4px 0}
+.sw label{font-size:0;color:transparent;overflow:hidden}
+.form-acts{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.head-acts{display:flex;gap:8px;flex-wrap:wrap}
+.iconbtn.go{color:#fff}
+.menu.fixed{position:fixed;right:auto;z-index:150}

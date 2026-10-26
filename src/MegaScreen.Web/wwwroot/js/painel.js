@@ -48,6 +48,18 @@
     const minhaAtual = () => fila.find(q => q.status === 'EmAtendimento' && (q.ponto || '') === M.localAtual);
     const closeMenus = () => $$('.menu.open').forEach(m => m.classList.remove('open'));
 
+    // O menu "•••" usa posição fixa para não ser cortado pela tabela/card (última linha da fila).
+    // Abre para baixo; se não couber na tela, abre para cima.
+    function abrirMenu(m, btn) {
+        m.classList.add('fixed', 'open');
+        const r = btn.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight, gap = 6;
+        const left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
+        const top = (r.bottom + gap + mh > window.innerHeight && r.top - gap - mh > 0) ? r.top - gap - mh : r.bottom + gap;
+        m.style.left = left + 'px'; m.style.top = top + 'px';
+    }
+    window.addEventListener('scroll', closeMenus, true);
+    window.addEventListener('resize', closeMenus);
+
     // ---------- Render ----------
     function render() {
         const filter = ($('#search')?.value || '').toLowerCase();
@@ -74,7 +86,7 @@
         $$('[data-menu]').forEach(b => b.onclick = e => {
             e.stopPropagation();
             const m = document.querySelector(`.menu[data-menufor="${b.dataset.menu}"]`);
-            const was = m.classList.contains('open'); closeMenus(); if (!was) m.classList.add('open');
+            const was = m.classList.contains('open'); closeMenus(); if (!was) abrirMenu(m, b);
         });
         $$('.menu [data-act]').forEach(b => b.onclick = async () => {
             closeMenus(); const id = +b.dataset.id, act = b.dataset.act;

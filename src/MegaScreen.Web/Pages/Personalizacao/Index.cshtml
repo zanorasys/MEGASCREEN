@@ -18,10 +18,10 @@
     </div></div>
 
     <div class="card"><div class="card-head"><h2>Exibição</h2></div><div class="form-pad">
-        <div class="toggle-row"><div class="tx">Mostrar horário<small>Relógio no topo do painel</small></div><div class="sw"><input asp-for="Item.MostrarHorario" data-pv="hora"><label asp-for="Item.MostrarHorario"></label></div></div>
-        <div class="toggle-row"><div class="tx">Número da chamada<small>Senha em destaque</small></div><div class="sw"><input asp-for="Item.MostrarNumero" data-pv="num"><label asp-for="Item.MostrarNumero"></label></div></div>
-        <div class="toggle-row"><div class="tx">Ordem de chamada<small>Lista lateral de últimas chamadas</small></div><div class="sw"><input asp-for="Item.MostrarOrdem" data-pv="ordem"><label asp-for="Item.MostrarOrdem"></label></div></div>
-        <div class="toggle-row"><div class="tx">Sala / guichê<small>Destino do atendimento</small></div><div class="sw"><input asp-for="Item.MostrarSala" data-pv="sala"><label asp-for="Item.MostrarSala"></label></div></div>
+        <div class="toggle-row"><div class="tx">Mostrar horário<small>Relógio no topo do painel</small></div><div class="sw"><input asp-for="Item.MostrarHorario" data-pv="hora"><label for="Item_MostrarHorario" title="Ligar/desligar"></label></div></div>
+        <div class="toggle-row"><div class="tx">Número da chamada<small>Senha em destaque</small></div><div class="sw"><input asp-for="Item.MostrarNumero" data-pv="num"><label for="Item_MostrarNumero" title="Ligar/desligar"></label></div></div>
+        <div class="toggle-row"><div class="tx">Ordem de chamada<small>Lista lateral de últimas chamadas</small></div><div class="sw"><input asp-for="Item.MostrarOrdem" data-pv="ordem"><label for="Item_MostrarOrdem" title="Ligar/desligar"></label></div></div>
+        <div class="toggle-row"><div class="tx">Sala / guichê<small>Destino do atendimento</small></div><div class="sw"><input asp-for="Item.MostrarSala" data-pv="sala"><label for="Item_MostrarSala" title="Ligar/desligar"></label></div></div>
         <div class="form2" style="margin-top:12px">
             <div class="field"><label>Nome do paciente na TV (LGPD)</label>
                 <select asp-for="Item.NomeNaTv" data-pv="nome">
