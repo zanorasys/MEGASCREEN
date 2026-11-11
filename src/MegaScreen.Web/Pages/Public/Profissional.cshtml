@@ -20,7 +20,7 @@
         </div>
         <div class="prof-side">
             <div class="prof-room"><label>Sala de atendimento</label><select id="profRoom">@foreach (var s in Model.Salas) { <option value="@s.Id" data-nome="@s.Nome">@s.Nome — @s.Predio · @s.Andar · R.@s.Ramal</option> }</select></div>
-            <div class="card"><div class="card-head"><h2>Fila</h2><span class="rt"><span class="dot"></span>Ao vivo</span></div><div class="next-list" id="profNext"></div></div>
+            <div class="card"><div class="card-head"><h2>Liberados pela recepção</h2><span class="rt"><span class="dot"></span>Ao vivo</span></div><div class="next-list" id="profNext"></div></div>
         </div>
     </div>
 </div>
@@ -36,16 +36,24 @@
     profRoom.onchange=()=>{try{localStorage.setItem('megaSalaProf',profRoom.value);}catch{}render();};
     // Paciente em atendimento NESTA sala (não o primeiro da filial).
     const atual=()=>fila.find(q=>q.status==='EmAtendimento'&&(q.ponto||'')===salaNome());
+    // Só entra na fila do profissional quem já passou pela recepção (etapa Profissional):
+    // primeiro os direcionados para esta sala, depois a fila geral. A ordem do servidor (prioridade + encaminhamento) é mantida.
+    function filaDaSala(){
+        const id=+profRoom.value||0;
+        const liberados=fila.filter(q=>q.etapa==='Profissional'&&q.status==='Aguardando');
+        return [...liberados.filter(q=>q.salaDestinoId===id),...liberados.filter(q=>q.salaDestinoId==null)];
+    }
     async function post(url){try{const r=await fetch(url,{method:'POST'});if(r.ok)return;let m='Não foi possível concluir a ação.';try{const j=await r.json();if(j&&j.erro)m=j.erro;}catch{}if(r.status===401)m='Sua sessão expirou. Faça login novamente.';alert(m);}catch{alert('Sem conexão com o servidor.');}}
     function render(){
         profSalaNome.textContent=salaNome()||'Sem sala';
         const a=atual();
         profSenha.textContent=a?a.codigo:'—'; profNome.textContent=a?(a.nome||'—'):'Nenhum paciente';
         profTags.innerHTML=a?`<span>${esc(a.modalidade)}</span>${a.prioridade!=='Normal'?`<span class="pri">${a.prioridade==='Alta'?'Prioridade':esc(a.prioridade)}</span>`:''}`:'';
-        const nxt=fila.filter(q=>q.status==='Aguardando').slice(0,4);
-        profNext.innerHTML=nxt.length?nxt.map((q,i)=>`<div class="next-item"><div class="o">${String(i+1).padStart(2,'0')}</div><span class="s">${q.codigo}</span><div class="nm2">${esc(q.nome||'—')}<small>${esc(q.modalidade)}</small></div></div>`).join(''):'<div class="next-empty">Fila vazia.</div>';
+        const nxt=filaDaSala().slice(0,6);
+        profNext.innerHTML=nxt.length?nxt.map((q,i)=>`<div class="next-item"><div class="o">${String(i+1).padStart(2,'0')}</div><span class="s">${esc(q.codigo)}</span><div class="nm2">${esc(q.nome||'—')}<small>${esc(q.modalidade)}</small></div>${q.salaDestinoId!=null?'<span class="tag-sala">Para esta sala</span>':''}</div>`).join(''):'<div class="next-empty">Nenhum paciente liberado pela recepção.</div>';
+        profCall.disabled=!nxt.length;
     }
-    async function chamarProximo(){if(!sel()){alert('Cadastre uma sala em Configuração > Salas.');return;}const n=fila.find(q=>q.status==='Aguardando');if(!n)return;await post(`/api/senhas/chamar/${n.id}?ponto=${encodeURIComponent(salaNome())}&salaId=${encodeURIComponent(profRoom.value)}`);}
+    async function chamarProximo(){if(!sel()){alert('Cadastre uma sala em Configuração > Salas.');return;}const n=filaDaSala()[0];if(!n){alert('Nenhum paciente liberado pela recepção.');return;}await post(`/api/senhas/chamar-profissional/${n.id}?salaId=${encodeURIComponent(profRoom.value)}`);}
     async function rechamar(){const a=atual();if(!a)return;await post(`/api/senhas/rechamar/${a.id}`);}
     async function concluir(){const a=atual();if(!a)return;await post(`/api/senhas/concluir/${a.id}`);}
     async function naoCompareceu(){const a=atual();if(!a)return;await post(`/api/senhas/status/${a.id}/4`);}

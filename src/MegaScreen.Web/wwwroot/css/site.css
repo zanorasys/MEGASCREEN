@@ -462,3 +462,12 @@
 .head-acts{display:flex;gap:8px;flex-wrap:wrap}
 .iconbtn.go{color:#fff}
 .menu.fixed{position:fixed;right:auto;z-index:150}
+
+/* ---------- Etapa Recepção -> Profissional ---------- */
+.st.etp-prof{background:#EFEAFE;color:var(--violet)}
+.btn.fwd{background:var(--violet);color:#fff}
+.iconbtn:disabled{opacity:.35;cursor:not-allowed}
+tr.etapa-prof td{background:#FBFAFF}
+.next-item .tag-sala{margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#EFEAFE;color:var(--violet);white-space:nowrap}
+.fwd-senha{font-family:"Space Grotesk";font-weight:700;font-size:15px;color:var(--primary-600);margin-bottom:12px}
+.fwd-hint{font-size:12px;color:var(--muted);margin-top:6px}

@@ -270,6 +270,16 @@ public sealed class DatabaseInitializer(IConfiguration configuration, IDbConnect
             CREATE INDEX IX_Senhas_Filial_Status_CriadaEm ON Senhas(FilialId, Status, CriadaEm);
         END;
 
+        -- Etapa Recepção -> Profissional (ver Data/Scripts/2026-11-11_Senhas_EtapaProfissional.sql).
+        IF COL_LENGTH('Senhas', 'Etapa') IS NULL
+            ALTER TABLE Senhas ADD Etapa int NOT NULL CONSTRAINT DF_Senhas_Etapa DEFAULT (1) WITH VALUES;
+        IF COL_LENGTH('Senhas', 'SalaDestinoId') IS NULL
+            ALTER TABLE Senhas ADD SalaDestinoId int NULL CONSTRAINT FK_Senhas_SalaDestino REFERENCES Salas(Id);
+        IF COL_LENGTH('Senhas', 'EncaminhadaEm') IS NULL
+            ALTER TABLE Senhas ADD EncaminhadaEm datetime2 NULL;
+        IF COL_LENGTH('Senhas', 'ChamadaRecepcaoEm') IS NULL
+            ALTER TABLE Senhas ADD ChamadaRecepcaoEm datetime2 NULL;
+
         IF OBJECT_ID('Personalizacoes', 'U') IS NULL
         BEGIN
             CREATE TABLE Personalizacoes (

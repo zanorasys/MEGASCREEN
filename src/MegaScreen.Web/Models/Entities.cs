@@ -8,6 +8,8 @@ public enum PerfilUsuario { Admin = 1, Atendente = 2, Profissional = 3 }
 public enum TipoTela { [Display(Name = "TV (horizontal)")] TvHorizontal = 1, [Display(Name = "Tablet / Totem (vertical)")] TabletVertical = 2 }
 public enum Prioridade { Normal = 1, Idoso = 2, [Display(Name = "Alta (PcD / gestante)")] Alta = 3 }
 public enum StatusSenha { Aguardando = 1, EmAtendimento = 2, Concluida = 3, NaoCompareceu = 4, Cancelada = 5 }
+/// <summary>Etapa do atendimento: o profissional só chama senhas liberadas pela recepção (Etapa = Profissional).</summary>
+public enum EtapaSenha { Recepcao = 1, Profissional = 2 }
 public enum NomeNaTv { Ocultar = 0, PrimeiroNomeInicial = 1, Completo = 2 }
 public enum AvisoChamada { Nenhum = 0, Som = 1, SomEVoz = 2 }
 
@@ -127,6 +129,14 @@ public class Senha
     public DateTime CriadaEm { get; set; } = DataHora.Agora();
     public DateTime? ChamadaEm { get; set; }
     public DateTime? ConcluidaEm { get; set; }
+    public EtapaSenha Etapa { get; set; } = EtapaSenha.Recepcao;
+    /// <summary>Consultório escolhido pela recepção ao encaminhar. Nulo = fila geral do profissional.</summary>
+    public int? SalaDestinoId { get; set; }
+    public DateTime? EncaminhadaEm { get; set; }
+    /// <summary>Hora da chamada na recepção (ChamadaEm é sobrescrita quando o profissional chama).</summary>
+    public DateTime? ChamadaRecepcaoEm { get; set; }
+    /// <summary>Nome da sala de destino (JOIN, não é coluna).</summary>
+    public string? SalaDestinoNome { get; set; }
 }
 
 public class PersonalizacaoGeral

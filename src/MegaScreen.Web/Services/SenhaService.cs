@@ -16,9 +16,11 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
     private const string ColunasSenha = """
         s.Id, s.FilialId, s.ModalidadeId, s.Codigo, s.Nome, s.Prioridade, s.Status,
                s.LocalAtual, s.PontoAtendimento, s.SalaId, s.CriadaEm, s.ChamadaEm, s.ConcluidaEm,
+               s.Etapa, s.SalaDestinoId, s.EncaminhadaEm, s.ChamadaRecepcaoEm, sd.Nome AS SalaDestinoNome,
                m.Id, m.FilialId, m.Nome, m.Prefixo, m.PrioridadeInterna, m.Ativa, m.Contador
         FROM Senhas s
         INNER JOIN Modalidades m ON m.Id = s.ModalidadeId
+        LEFT JOIN Salas sd ON sd.Id = s.SalaDestinoId
         """;
 
     private const string SelectSenhaComModalidade = "SELECT " + ColunasSenha;
@@ -29,8 +31,9 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
         return senha;
     }
 
-    /// <summary>Fila do dia (hora de São Paulo): aguardando + em atendimento.
-    /// Ordem: prioritários (idoso/PcD) primeiro, depois prioridade interna da modalidade, depois ordem de chegada.</summary>
+    /// <summary>Fila do dia (hora de São Paulo): aguardando + em atendimento, nas duas etapas.
+    /// Ordem: prioritários (idoso/PcD) primeiro, depois prioridade interna da modalidade, depois ordem de chegada
+    /// (na etapa Profissional, a ordem de chegada é a hora em que a recepção encaminhou).</summary>
     public async Task<List<Senha>> FilaAsync(int filialId)
     {
         var sql = SelectSenhaComModalidade + """
@@ -40,7 +43,7 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
               AND s.CriadaEm >= @hoje AND s.CriadaEm < @amanha
             ORDER BY CASE WHEN s.Prioridade = @normal THEN 1 ELSE 0 END,
                      m.PrioridadeInterna DESC,
-                     s.CriadaEm;
+                     COALESCE(s.EncaminhadaEm, s.CriadaEm);
             """;
         var hoje = DataHora.Hoje();
         using var db = connectionFactory.CreateConnection();
@@ -120,13 +123,13 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
 
         var senha = await db.QuerySingleAsync<Senha>("""
             INSERT INTO Senhas
-                (FilialId, ModalidadeId, Codigo, Nome, Prioridade, Status, CriadaEm)
+                (FilialId, ModalidadeId, Codigo, Nome, Prioridade, Status, Etapa, CriadaEm)
             OUTPUT INSERTED.Id, INSERTED.FilialId, INSERTED.ModalidadeId, INSERTED.Codigo,
                    INSERTED.Nome, INSERTED.Prioridade, INSERTED.Status, INSERTED.LocalAtual,
                    INSERTED.PontoAtendimento, INSERTED.SalaId, INSERTED.CriadaEm,
-                   INSERTED.ChamadaEm, INSERTED.ConcluidaEm
+                   INSERTED.ChamadaEm, INSERTED.ConcluidaEm, INSERTED.Etapa
             VALUES
-                (@FilialId, @ModalidadeId, @Codigo, @Nome, @Prioridade, @Status, @CriadaEm);
+                (@FilialId, @ModalidadeId, @Codigo, @Nome, @Prioridade, @Status, @Etapa, @CriadaEm);
             """, new
         {
             FilialId = filialId,
@@ -135,6 +138,7 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
             Nome = string.IsNullOrWhiteSpace(vm.Nome) ? null : vm.Nome.Trim(),
             Prioridade = (int)vm.Prioridade,
             Status = (int)StatusSenha.Aguardando,
+            Etapa = (int)EtapaSenha.Recepcao,
             CriadaEm = agora
         }, tx);
 
@@ -145,34 +149,131 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
         return senha;
     }
 
-    /// <summary>Chama a senha somente se ela ainda estiver aguardando (evita dois guichês chamarem a mesma).</summary>
-    public async Task ChamarAsync(int filialId, int senhaId, string ponto, int? salaId = null)
+    /// <summary>Recepção chama a senha (etapa Recepção) somente se ela ainda estiver aguardando
+    /// (evita dois guichês chamarem a mesma). Senhas já encaminhadas ao profissional não podem ser chamadas aqui.</summary>
+    public async Task ChamarAsync(int filialId, int senhaId, string ponto)
     {
         using var db = connectionFactory.CreateConnection();
         var linhas = await db.ExecuteAsync("""
             UPDATE Senhas
             SET Status = @emAtendimento,
                 PontoAtendimento = @ponto,
-                SalaId = (SELECT sa.Id FROM Salas sa WHERE sa.Id = @salaId AND sa.FilialId = @filialId),
+                SalaId = NULL,
                 ChamadaEm = @agora
-            WHERE Id = @senhaId AND FilialId = @filialId AND Status = @aguardando;
+            WHERE Id = @senhaId AND FilialId = @filialId
+              AND Status = @aguardando AND Etapa = @recepcao;
             """, new
         {
             senhaId,
             filialId,
             ponto,
-            salaId,
             emAtendimento = (int)StatusSenha.EmAtendimento,
             aguardando = (int)StatusSenha.Aguardando,
+            recepcao = (int)EtapaSenha.Recepcao,
             agora = DataHora.Agora()
         });
 
         if (linhas == 0)
-            throw new RegraNegocioException("Esta senha não está mais aguardando. Talvez outro atendente já a tenha chamado.");
+        {
+            var atual = await ObterComModalidadeAsync(db, filialId, senhaId);
+            throw new RegraNegocioException(atual?.Etapa == EtapaSenha.Profissional
+                ? "Esta senha já foi encaminhada ao profissional e não pode ser chamada pela recepção."
+                : "Esta senha não está mais aguardando. Talvez outro atendente já a tenha chamado.");
+        }
 
+        await AposChamar(db, filialId, senhaId);
+    }
+
+    /// <summary>Recepção libera a senha para o profissional. salaDestinoId nulo = fila geral;
+    /// informado = só aquele consultório poderá chamar. A senha volta a "Aguardando" na etapa Profissional.</summary>
+    public async Task EncaminharAsync(int filialId, int senhaId, int? salaDestinoId)
+    {
+        using var db = connectionFactory.CreateConnection();
+        if (salaDestinoId is not null)
+        {
+            var existe = await db.ExecuteScalarAsync<int>(
+                "SELECT COUNT(1) FROM Salas WHERE Id = @salaDestinoId AND FilialId = @filialId;",
+                new { salaDestinoId, filialId });
+            if (existe == 0) throw new RegraNegocioException("Sala de destino não encontrada nesta filial.");
+        }
+
+        var agora = DataHora.Agora();
+        var linhas = await db.ExecuteAsync("""
+            UPDATE Senhas
+            SET Etapa = @profissional,
+                Status = @aguardando,
+                SalaDestinoId = @salaDestinoId,
+                EncaminhadaEm = @agora,
+                ChamadaRecepcaoEm = COALESCE(ChamadaEm, @agora)
+            WHERE Id = @senhaId AND FilialId = @filialId
+              AND Etapa = @recepcao
+              AND Status IN (@aguardando, @emAtendimento);
+            """, new
+        {
+            senhaId,
+            filialId,
+            salaDestinoId,
+            agora,
+            profissional = (int)EtapaSenha.Profissional,
+            recepcao = (int)EtapaSenha.Recepcao,
+            aguardando = (int)StatusSenha.Aguardando,
+            emAtendimento = (int)StatusSenha.EmAtendimento
+        });
+        if (linhas == 0)
+            throw new RegraNegocioException("Senha não encontrada, já finalizada ou já encaminhada ao profissional.");
+
+        await Broadcast(filialId);
+    }
+
+    /// <summary>Profissional chama: só senhas que já passaram pela recepção (etapa Profissional, aguardando),
+    /// da fila geral ou direcionadas para a sala dele.</summary>
+    public async Task ChamarProfissionalAsync(int filialId, int senhaId, int salaId)
+    {
+        using var db = connectionFactory.CreateConnection();
+        var sala = await db.QuerySingleOrDefaultAsync<Sala>(
+            "SELECT Id, FilialId, Nome FROM Salas WHERE Id = @salaId AND FilialId = @filialId;",
+            new { salaId, filialId })
+            ?? throw new RegraNegocioException("Sala de atendimento não encontrada.");
+
+        var linhas = await db.ExecuteAsync("""
+            UPDATE Senhas
+            SET Status = @emAtendimento,
+                PontoAtendimento = @ponto,
+                SalaId = @salaId,
+                ChamadaEm = @agora
+            WHERE Id = @senhaId AND FilialId = @filialId
+              AND Status = @aguardando AND Etapa = @profissional
+              AND (SalaDestinoId IS NULL OR SalaDestinoId = @salaId);
+            """, new
+        {
+            senhaId,
+            filialId,
+            salaId = sala.Id,
+            ponto = sala.Nome,
+            emAtendimento = (int)StatusSenha.EmAtendimento,
+            aguardando = (int)StatusSenha.Aguardando,
+            profissional = (int)EtapaSenha.Profissional,
+            agora = DataHora.Agora()
+        });
+
+        if (linhas == 0)
+        {
+            var atual = await ObterComModalidadeAsync(db, filialId, senhaId)
+                ?? throw new RegraNegocioException("Senha não encontrada.");
+            if (atual.Etapa != EtapaSenha.Profissional)
+                throw new RegraNegocioException("Este paciente ainda não passou pela recepção.");
+            if (atual.SalaDestinoId is not null && atual.SalaDestinoId != sala.Id)
+                throw new RegraNegocioException($"Este paciente foi direcionado para {atual.SalaDestinoNome ?? "outra sala"}.");
+            throw new RegraNegocioException("Este paciente não está mais aguardando. Talvez outro profissional já o tenha chamado.");
+        }
+
+        await AposChamar(db, filialId, senhaId);
+    }
+
+    private async Task AposChamar(IDbConnection db, int filialId, int senhaId)
+    {
         var senha = await ObterComModalidadeAsync(db, filialId, senhaId)
             ?? throw new RegraNegocioException("Senha não encontrada.");
-
         await AvisarChamada(filialId, senha);
         await Broadcast(filialId);
     }

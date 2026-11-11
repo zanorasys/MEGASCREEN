@@ -29,6 +29,10 @@ public class SenhaDto
     [JsonPropertyName("sala")] public string? Sala { get; set; }
     [JsonPropertyName("criadaEm")] public DateTime CriadaEm { get; set; }
     [JsonPropertyName("chamadaEm")] public DateTime? ChamadaEm { get; set; }
+    [JsonPropertyName("etapa")] public string Etapa { get; set; } = "Recepcao";
+    [JsonPropertyName("salaDestinoId")] public int? SalaDestinoId { get; set; }
+    [JsonPropertyName("salaDestino")] public string? SalaDestino { get; set; }
+    [JsonPropertyName("encaminhadaEm")] public DateTime? EncaminhadaEm { get; set; }
 
     public static SenhaDto From(Senha s) => new()
     {
@@ -40,7 +44,11 @@ public class SenhaDto
         Status = s.Status.ToString(),
         Ponto = s.PontoAtendimento,
         CriadaEm = s.CriadaEm,
-        ChamadaEm = s.ChamadaEm
+        ChamadaEm = s.ChamadaEm,
+        Etapa = s.Etapa.ToString(),
+        SalaDestinoId = s.SalaDestinoId,
+        SalaDestino = s.SalaDestinoNome,
+        EncaminhadaEm = s.EncaminhadaEm
     };
 }
 

@@ -468,8 +468,9 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
               ISNULL(SUM(CASE WHEN Status=@Aguardando AND CriadaEm>=@hoje AND CriadaEm<@amanha THEN 1 ELSE 0 END),0) Aguardando,
               ISNULL(SUM(CASE WHEN Status=@EmAtendimento AND CriadaEm>=@hoje AND CriadaEm<@amanha THEN 1 ELSE 0 END),0) EmAtendimento,
               ISNULL(SUM(CASE WHEN Status=@Concluida AND ConcluidaEm>=@hoje AND ConcluidaEm<@amanha THEN 1 ELSE 0 END),0) ConcluidosHoje,
-              ISNULL(AVG(CASE WHEN ChamadaEm IS NOT NULL AND CriadaEm>=@hoje AND CriadaEm<@amanha
-                    THEN DATEDIFF(second,CriadaEm,ChamadaEm) END),0) EsperaMediaSegundos
+              -- Espera da recepção: ChamadaEm é sobrescrita quando o profissional chama, por isso usa ChamadaRecepcaoEm.
+              ISNULL(AVG(CASE WHEN COALESCE(ChamadaRecepcaoEm,ChamadaEm) IS NOT NULL AND CriadaEm>=@hoje AND CriadaEm<@amanha
+                    THEN DATEDIFF(second,CriadaEm,COALESCE(ChamadaRecepcaoEm,ChamadaEm)) END),0) EsperaMediaSegundos
             FROM Senhas WHERE FilialId=@filialId;
             """,new { filialId,hoje,amanha=hoje.AddDays(1),Aguardando=(int)StatusSenha.Aguardando,EmAtendimento=(int)StatusSenha.EmAtendimento,Concluida=(int)StatusSenha.Concluida });
     }

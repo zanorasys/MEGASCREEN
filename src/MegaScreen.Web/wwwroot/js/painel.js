@@ -9,6 +9,11 @@
     const esc = s => (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     let fila = M.fila || [];
     let addPri = 1;
+    let encaminharId = null;
+    // Etapas: a recepção só chama senhas da etapa Recepção; as encaminhadas ficam visíveis, mas são do profissional.
+    const naRecepcao = q => (q.etapa || 'Recepcao') === 'Recepcao';
+    const noProfissional = q => q.etapa === 'Profissional';
+    const inicioEspera = q => q.encaminhadaEm || q.criadaEm;
 
     function toast(msg) {
         const host = $('#toasts');
@@ -64,21 +69,25 @@
     function render() {
         const filter = ($('#search')?.value || '').toLowerCase();
         const rows = fila.filter(q => !filter || q.codigo.toLowerCase().includes(filter) || (q.nome || '').toLowerCase().includes(filter) || (q.modalidade || '').toLowerCase().includes(filter));
-        $('#queueBody').innerHTML = rows.length ? rows.map((q, i) => `
-        <tr><td class="ord">${String(i + 1).padStart(2, '0')}</td>
+        $('#queueBody').innerHTML = rows.length ? rows.map((q, i) => {
+            const rec = naRecepcao(q), podeChamar = rec && q.status === 'Aguardando';
+            return `
+        <tr${rec ? '' : ' class="etapa-prof"'}><td class="ord">${String(i + 1).padStart(2, '0')}</td>
         <td><span class="senha-chip">${esc(q.codigo)}</span></td><td class="nm">${esc(q.nome || '—')}</td>
         <td>${esc(q.modalidade)}</td><td><span class="pri ${PRICLASS[q.prioridade] || 'normal'}">${esc(PRILABEL[q.prioridade] || q.prioridade)}</span></td>
-        <td><span class="st ${q.status === 'EmAtendimento' ? 'att' : 'wait'}">${q.status === 'EmAtendimento' ? 'Em atendimento' + (q.ponto ? ' · ' + esc(q.ponto) : '') : 'Aguardando'}</span></td>
+        <td>${statusHtml(q)}</td>
         <td><div class="rowacts">
-          <button class="iconbtn go" title="Chamar" data-call="${q.id}">→</button>
+          ${podeChamar ? `<button class="iconbtn go" title="Chamar" data-call="${q.id}">→</button>` : `<button class="iconbtn go" title="${rec ? 'Em atendimento' : 'Com o profissional'}" disabled>→</button>`}
           <button class="iconbtn" title="Mais ações" data-menu="${q.id}">•••</button>
           <div class="menu" data-menufor="${q.id}">
-            <button data-act="call" data-id="${q.id}">Chamar agora</button>
+            ${podeChamar ? `<button data-act="call" data-id="${q.id}">Chamar agora</button>` : ''}
+            ${rec && M.podeEncaminhar ? `<button data-act="fwd" data-id="${q.id}">Encaminhar ao profissional</button>` : ''}
             <button data-act="finish" data-id="${q.id}">Concluir</button>
             <button data-act="noshow" data-id="${q.id}">Não compareceu</button>
-            <button data-act="move" data-id="${q.id}">Enviar para outro local</button>
+            ${rec ? `<button data-act="move" data-id="${q.id}">Enviar para outro local</button>` : ''}
             <div class="sep"></div><button class="danger" data-act="cancel" data-id="${q.id}">Cancelar senha</button>
-          </div></div></td></tr>`).join('') : '<tr class="empty-row"><td colspan="7">Nada na fila para exibir.</td></tr>';
+          </div></div></td></tr>`;
+        }).join('') : '<tr class="empty-row"><td colspan="7">Nada na fila para exibir.</td></tr>';
 
         renderProximas();
 
@@ -91,21 +100,32 @@
         $$('.menu [data-act]').forEach(b => b.onclick = async () => {
             closeMenus(); const id = +b.dataset.id, act = b.dataset.act;
             if (act === 'call') await chamar(id);
+            if (act === 'fwd') abrirEncaminhar(id);
             if (act === 'finish') await concluir(id);
             if (act === 'noshow') await status(id, 4);
             if (act === 'cancel') await status(id, 5);
             if (act === 'move') { const destino = prompt('Enviar para qual local / guichê?'); if (destino?.trim()) await post(`/api/senhas/mover/${id}?destino=${encodeURIComponent(destino.trim())}`); }
         });
 
-        const aguardando = fila.filter(q => q.status === 'Aguardando').length;
+        const aguardando = fila.filter(q => q.status === 'Aguardando' && naRecepcao(q)).length;
         const nav = $('#navCount'); if (nav) { nav.textContent = aguardando; nav.style.display = aguardando ? '' : 'none'; }
         renderCalling();
         renderPontos();
         renderSino();
     }
 
+    function statusHtml(q) {
+        const sala = q.salaDestino ? ' · ' + esc(q.salaDestino) : '';
+        if (noProfissional(q)) return q.status === 'EmAtendimento'
+            ? `<span class="st att">Com o profissional${q.ponto ? ' · ' + esc(q.ponto) : ''}</span>`
+            : `<span class="st etp-prof">Aguardando profissional${sala}</span>`;
+        return q.status === 'EmAtendimento'
+            ? `<span class="st att">Em atendimento${q.ponto ? ' · ' + esc(q.ponto) : ''}</span>`
+            : '<span class="st wait">Aguardando</span>';
+    }
+
     function renderProximas() {
-        const nxt = fila.filter(q => q.status === 'Aguardando').slice(0, 3);
+        const nxt = fila.filter(q => q.status === 'Aguardando' && naRecepcao(q)).slice(0, 3);
         $('#nextList').innerHTML = nxt.length ? nxt.map((q, i) => `<div class="next-item"><div class="o">${String(i + 1).padStart(2, '0')}</div><span class="s">${esc(q.codigo)}</span><div class="nm2">${esc(q.nome || '—')}<small>${esc(q.modalidade)}</small></div><span class="t">${esperaMin(q.criadaEm)}min</span></div>`).join('') : '<div class="next-empty">Sem próximas na fila.</div>';
     }
 
@@ -114,8 +134,9 @@
         if (!c) { el.innerHTML = '<div class="empty">Nenhuma senha em atendimento. Use "Chamar próxima".</div>'; return; }
         el.innerHTML = `<div class="senha num">${esc(c.codigo)}</div><div class="who"><div class="nm">${esc(c.nome || '—')}</div>
         <div class="meta"><span class="pill">${esc(c.modalidade)}</span>${c.prioridade !== 'Normal' ? `<span class="pill pri">${esc(PRILABEL[c.prioridade] || c.prioridade)}</span>` : ''}<span>${esc(c.ponto || M.localAtual)}</span></div></div>
-        <div class="acts"><button class="btn call" id="recall">Rechamar</button><button class="btn done" id="finish">Concluir chamada</button></div>`;
+        <div class="acts"><button class="btn call" id="recall">Rechamar</button>${naRecepcao(c) && M.podeEncaminhar ? '<button class="btn fwd" id="forward">Encaminhar ao profissional</button>' : ''}<button class="btn done" id="finish">Concluir chamada</button></div>`;
         $('#recall').onclick = () => post(`/api/senhas/rechamar/${c.id}`);
+        if ($('#forward')) $('#forward').onclick = () => abrirEncaminhar(c.id);
         $('#finish').onclick = () => concluir(c.id);
     }
 
@@ -142,11 +163,11 @@
         const bell = $('#bell'); if (!bell) return;
         const limite = +M.alertaMin || 0;
         if (!limite) { bell.style.display = 'none'; return; }
-        const atrasadas = fila.filter(q => q.status === 'Aguardando' && esperaMin(q.criadaEm) >= limite);
+        const atrasadas = fila.filter(q => q.status === 'Aguardando' && esperaMin(inicioEspera(q)) >= limite);
         const badge = $('#bellBadge');
         badge.textContent = atrasadas.length; badge.style.display = atrasadas.length ? '' : 'none';
         $('#bellPop').innerHTML = `<h4>Aguardando há ${limite} min ou mais</h4>` + (atrasadas.length
-            ? atrasadas.map(q => `<div class="bi"><b>${esc(q.codigo)}</b>${esc(q.nome || q.modalidade)}<span>${esperaMin(q.criadaEm)}min</span></div>`).join('')
+            ? atrasadas.map(q => `<div class="bi"><b>${esc(q.codigo)}</b>${esc(q.nome || q.modalidade)}${noProfissional(q) ? ' <small>(profissional)</small>' : ''}<span>${esperaMin(inicioEspera(q))}min</span></div>`).join('')
             : '<div class="vazio">Nenhuma senha acima do limite.</div>');
     }
 
@@ -171,7 +192,26 @@
     async function chamar(id) { await post(`/api/senhas/chamar/${id}?ponto=${encodeURIComponent(M.localAtual)}`); }
     async function concluir(id) { await post(`/api/senhas/concluir/${id}`); }
     async function status(id, st) { await post(`/api/senhas/status/${id}/${st}`); }
-    async function callNext() { const n = fila.find(q => q.status === 'Aguardando'); if (!n) return toast('Não há senhas aguardando'); await chamar(n.id); }
+    async function callNext() { const n = fila.find(q => q.status === 'Aguardando' && naRecepcao(q)); if (!n) return toast('Não há senhas aguardando na recepção'); await chamar(n.id); }
+
+    // ---------- Encaminhar ao profissional (fila geral ou consultório específico) ----------
+    function abrirEncaminhar(id) {
+        const q = fila.find(x => x.id === id); if (!q) return;
+        encaminharId = id;
+        $('#fwdSenha').textContent = q.codigo + (q.nome ? ' · ' + q.nome : '');
+        $('#fwdSala').value = '';
+        $('#fwdOverlay').classList.add('open');
+    }
+    function fecharEncaminhar() { encaminharId = null; $('#fwdOverlay').classList.remove('open'); }
+    if ($('#fwdOverlay')) {
+        $('#fwdX').onclick = $('#fwdCancel').onclick = fecharEncaminhar;
+        $('#fwdSave').onclick = async () => {
+            if (!encaminharId) return;
+            const sel = $('#fwdSala'), sala = sel.value, nomeSala = sel.selectedOptions[0]?.text || '', id = encaminharId;
+            const ok = await post(`/api/senhas/encaminhar/${id}` + (sala ? `?salaId=${encodeURIComponent(sala)}` : ''));
+            if (ok) { fecharEncaminhar(); toast(sala ? 'Encaminhado para ' + nomeSala : 'Encaminhado para a fila do profissional'); }
+        };
+    }
 
     function cupomHtml(it) {
         return `<div class="cupom"><div class="ctop"><div class="un">${esc(M.marca || 'Mega Screen')}</div><div class="lo">${esc(M.filialNome)} · ${esc(M.localAtual)}</div></div>

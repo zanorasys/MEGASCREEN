@@ -159,10 +159,21 @@ api.MapPost("/emitir/{filialId:int}", async (int filialId, NovaSenhaViewModel vm
     catch (RegraNegocioException ex) { return Results.BadRequest(new { erro = ex.Message }); }
 }).AllowAnonymous().RequireRateLimiting("emitir");
 
-api.MapPost("/chamar/{id:int}", (int id, string? ponto, int? salaId, HttpContext http, SenhaService svc) =>
+// Recepção: chama somente senhas da etapa Recepção.
+api.MapPost("/chamar/{id:int}", (int id, string? ponto, HttpContext http, SenhaService svc) =>
     Executar(() => svc.ChamarAsync(http.User.FilialId(), id,
-        string.IsNullOrWhiteSpace(ponto) ? "Guichê" : ponto.Trim(), salaId)))
+        string.IsNullOrWhiteSpace(ponto) ? "Guichê" : ponto.Trim())))
     .RequireAuthorization();
+
+// Recepção libera o paciente para o profissional (salaId vazio = fila geral).
+api.MapPost("/encaminhar/{id:int}", (int id, int? salaId, HttpContext http, SenhaService svc) =>
+    Executar(() => svc.EncaminharAsync(http.User.FilialId(), id, salaId is > 0 ? salaId : null)))
+    .RequireAuthorization(p => p.RequireRole("Admin", "Atendente"));
+
+// Profissional: chama somente quem já passou pela recepção (fila geral ou direcionado à sala dele).
+api.MapPost("/chamar-profissional/{id:int}", (int id, int salaId, HttpContext http, SenhaService svc) =>
+    Executar(() => svc.ChamarProfissionalAsync(http.User.FilialId(), id, salaId)))
+    .RequireAuthorization(p => p.RequireRole("Admin", "Profissional"));
 
 api.MapPost("/rechamar/{id:int}", (int id, HttpContext http, SenhaService svc) =>
     Executar(() => svc.RechamarAsync(http.User.FilialId(), id)))
