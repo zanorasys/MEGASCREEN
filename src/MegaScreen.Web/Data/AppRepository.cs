@@ -206,7 +206,7 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
         using var db = Open();
         var sql = """
             SELECT Id,FilialId,Nome,Prefixo,PrioridadeInterna,Ativa,Contador
-            FROM Modalidades WHERE FilialId=@filialId
+            FROM Modalidades WHERE FilialId=@filialId AND Excluida=0
             """ + (somenteAtivas ? " AND Ativa=1" : "") + " ORDER BY Nome;";
         return (await db.QueryAsync<Modalidade>(sql,new { filialId })).ToList();
     }
@@ -227,10 +227,27 @@ public sealed class AppRepository(IDbConnectionFactory connectionFactory)
                 """, new { item.Id,item.FilialId,item.Nome,item.Prefixo,PrioridadeInterna=(int)item.PrioridadeInterna,item.Ativa });
     }
 
+    /// <summary>
+    /// Exclui a modalidade. Sem senhas emitidas: remove o registro. Com histórico de senhas (FK):
+    /// marca Excluida=1 e Ativa=0, preservando relatórios e saindo do grid/totem.
+    /// </summary>
     public async Task ExcluirModalidadeAsync(int id,int filialId)
     {
         using var db = Open();
-        await db.ExecuteAsync("UPDATE Modalidades SET Ativa=0 WHERE Id=@id AND FilialId=@filialId;", new { id,filialId });
+        try
+        {
+            var linhas = await db.ExecuteAsync("""
+                DELETE FROM Modalidades
+                WHERE Id=@id AND FilialId=@filialId
+                  AND NOT EXISTS (SELECT 1 FROM Senhas WHERE ModalidadeId=@id);
+                """, new { id,filialId });
+            if (linhas > 0) return;
+        }
+        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 547)
+        {
+            // Outra tabela referencia a modalidade (ex.: sequência diária): cai na exclusão lógica abaixo.
+        }
+        await db.ExecuteAsync("UPDATE Modalidades SET Ativa=0, Excluida=1 WHERE Id=@id AND FilialId=@filialId;", new { id,filialId });
     }
 
     public async Task<List<Sala>> ListarSalasAsync(int filialId)

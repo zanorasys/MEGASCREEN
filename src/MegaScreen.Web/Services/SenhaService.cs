@@ -94,6 +94,14 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
             Ponto = s.PontoAtendimento
         }).ToList();
 
+    /// <summary>Nome do paciente: sem espaços duplicados e limitado ao tamanho da coluna (120).</summary>
+    private static string? NormalizarNome(string? nome)
+    {
+        if (string.IsNullOrWhiteSpace(nome)) return null;
+        var n = string.Join(' ', nome.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return n.Length > 120 ? n[..120].TrimEnd() : n;
+    }
+
     public async Task<Senha> EmitirAsync(int filialId, NovaSenhaViewModel vm)
     {
         var agora = DataHora.Agora();
@@ -135,7 +143,7 @@ public class SenhaService(IDbConnectionFactory connectionFactory, IHubContext<Se
             FilialId = filialId,
             ModalidadeId = modalidade.Id,
             Codigo = codigo,
-            Nome = string.IsNullOrWhiteSpace(vm.Nome) ? null : vm.Nome.Trim(),
+            Nome = NormalizarNome(vm.Nome),
             Prioridade = (int)vm.Prioridade,
             Status = (int)StatusSenha.Aguardando,
             Etapa = (int)EtapaSenha.Recepcao,

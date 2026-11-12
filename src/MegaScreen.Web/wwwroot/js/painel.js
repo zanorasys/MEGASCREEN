@@ -72,9 +72,9 @@
         $('#queueBody').innerHTML = rows.length ? rows.map((q, i) => {
             const rec = naRecepcao(q), podeChamar = rec && q.status === 'Aguardando';
             return `
-        <tr${rec ? '' : ' class="etapa-prof"'}><td class="ord">${String(i + 1).padStart(2, '0')}</td>
-        <td><span class="senha-chip">${esc(q.codigo)}</span></td><td class="nm">${esc(q.nome || '—')}</td>
-        <td>${esc(q.modalidade)}</td><td><span class="pri ${PRICLASS[q.prioridade] || 'normal'}">${esc(PRILABEL[q.prioridade] || q.prioridade)}</span></td>
+        <tr${rec ? '' : ' class="etapa-prof"'}><td class="ord c-ord">${String(i + 1).padStart(2, '0')}</td>
+        <td><span class="senha-chip">${esc(q.codigo)}</span></td><td class="nm c-nome" title="${esc(q.nome || '')}">${esc(q.nome || '—')}</td>
+        <td class="c-mod">${esc(q.modalidade)}</td><td><span class="pri ${PRICLASS[q.prioridade] || 'normal'}">${esc(PRILABEL[q.prioridade] || q.prioridade)}</span></td>
         <td>${statusHtml(q)}</td>
         <td><div class="rowacts">
           ${podeChamar ? `<button class="iconbtn go" title="Chamar" data-call="${q.id}">→</button>` : `<button class="iconbtn go" title="${rec ? 'Em atendimento' : 'Com o profissional'}" disabled>→</button>`}

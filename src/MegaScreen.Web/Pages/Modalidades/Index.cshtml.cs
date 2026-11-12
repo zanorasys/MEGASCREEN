@@ -23,5 +23,5 @@ public class IndexModel(AppRepository repository) : PageModel
         if(!ModelState.IsValid){await OnGetAsync(Item.Id==0?null:Item.Id);return Page();}
         await repository.SalvarModalidadeAsync(Item); TempData["Toast"]="Modalidade salva."; return RedirectToPage();
     }
-    public async Task<IActionResult> OnPostDeleteAsync(int id){await repository.ExcluirModalidadeAsync(id,User.FilialId());TempData["Toast"]="Modalidade desativada.";return RedirectToPage();}
+    public async Task<IActionResult> OnPostDeleteAsync(int id){await repository.ExcluirModalidadeAsync(id,User.FilialId());TempData["Toast"]="Modalidade excluída.";return RedirectToPage();}
 }

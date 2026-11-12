@@ -471,3 +471,79 @@ tr.etapa-prof td{background:#FBFAFF}
 .next-item .tag-sala{margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#EFEAFE;color:var(--violet);white-space:nowrap}
 .fwd-senha{font-family:"Space Grotesk";font-weight:700;font-size:15px;color:var(--primary-600);margin-bottom:12px}
 .fwd-hint{font-size:12px;color:var(--muted);margin-top:6px}
+
+/* ===== 12/11/2026: layout para laptop (1280–1440px), Telas, Painel e nome no Totem ===== */
+/* Evita que tabelas largas "estourem" o grid e espremam a coluna do formulário. */
+.grid>*,.cfg-grid>*,.stack>*{min-width:0}
+.table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.table-wrap table{min-width:100%}
+
+/* Formulário em 4 colunas (Telas): ocupa a largura toda acima da tabela. */
+.form4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 14px}
+.field input[type=color]{height:44px;padding:4px 6px;cursor:pointer}
+.tbl-telas th,.tbl-telas td{padding-left:12px;padding-right:12px}
+.tbl-telas .badge-type,.tbl-telas .st,.tbl-telas .tel-link,.tbl-telas .rowacts,.tbl-telas td.ord{white-space:nowrap}
+.tbl-telas td.nm small{color:var(--muted);font-weight:600}
+
+/* Painel: fila com mais espaço; coluna lateral com largura fixa. */
+.painel-grid{grid-template-columns:minmax(0,1fr) 320px}
+.fila th,.fila td{padding-left:12px;padding-right:12px}
+.fila td{vertical-align:middle}
+.fila .senha-chip,.fila .pri,.fila .rowacts{white-space:nowrap}
+.fila td.c-nome{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fila td.c-mod{max-width:160px}
+.fila .st{white-space:normal;line-height:1.35}
+.calling .acts{flex-wrap:wrap}
+.calling .who{min-width:0}
+.painel-side .card-head h2{white-space:nowrap}
+.painel-side .card-head .sub{margin-left:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media (min-width:861px) and (max-width:1440px){
+  .app{grid-template-columns:224px 1fr}
+  .side{padding:16px 12px}
+}
+@media (max-width:1440px){
+  .topbar{padding:12px 20px;gap:10px}
+  .content{padding:18px 20px 32px}
+  .kpis{gap:12px;margin-bottom:14px}
+  .kpi{padding:12px 14px}
+  .kpi .kv{font-size:24px;margin-top:6px}
+  .grid{gap:14px}
+  .stack{gap:14px}
+  .painel-grid{grid-template-columns:minmax(0,1fr) 280px}
+  .calling{padding:14px 16px;gap:14px;min-height:88px}
+  .calling .senha{font-size:42px}
+  .calling .who .nm{font-size:16px}
+  .calling .acts .btn{padding:9px 13px;font-size:12.5px}
+  .qtool{padding:10px 14px}
+  .fila thead th{padding-top:9px;padding-bottom:9px}
+  .fila tbody td{padding-top:9px;padding-bottom:9px;font-size:13px}
+  .fila td.c-nome{max-width:180px}
+  .next-list{padding:6px 8px 10px}
+  .next-item{padding:8px 6px;gap:10px}
+}
+@media (max-width:1280px){
+  .painel-grid{grid-template-columns:minmax(0,1fr) 250px}
+  .fila .c-ord{display:none}
+  .fila th,.fila td{padding-left:10px;padding-right:10px}
+  .fila td.c-nome{max-width:150px}
+  .topbar .btn.sm{padding:8px 10px;font-size:12px}
+}
+@media (max-width:1100px){ .form4{grid-template-columns:repeat(2,minmax(0,1fr))} }
+/* Abaixo de 1160px o grid já empilha: os cards laterais ficam lado a lado embaixo da fila. */
+@media (max-width:1160px){
+  .painel-grid{grid-template-columns:1fr}
+  .painel-side{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+}
+@media (max-width:860px){ .form4{grid-template-columns:1fr} .painel-side{grid-template-columns:1fr} }
+
+/* Totem: etapa do nome do paciente */
+.tnome{display:flex;flex-direction:column;align-items:stretch;gap:14px;width:100%;max-width:620px;margin:0 auto}
+.tnome input{width:100%;padding:22px 24px;border-radius:18px;border:2px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;font-family:inherit;font-size:28px;font-weight:700;outline:none;text-align:center}
+.tnome input::placeholder{color:rgba(255,255,255,.45);font-weight:600}
+.tnome input:focus{border-color:#fff;background:rgba(255,255,255,.16)}
+.tnome-hint{text-align:center;color:#b9bce4;font-size:15px}
+.tnome-ok{min-height:84px;background:var(--primary);border-color:var(--primary)}
+.tnome-ok:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.totem-done .tnome-done{font-size:26px;font-weight:800;margin-top:6px;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tstep3{justify-content:flex-start;padding-top:4vh}

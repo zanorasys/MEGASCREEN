@@ -270,6 +270,10 @@ public sealed class DatabaseInitializer(IConfiguration configuration, IDbConnect
             CREATE INDEX IX_Senhas_Filial_Status_CriadaEm ON Senhas(FilialId, Status, CriadaEm);
         END;
 
+        -- Exclusão lógica de modalidades com histórico (ver Data/Scripts/2026-11-12_Modalidades_Excluida.sql).
+        IF COL_LENGTH('Modalidades', 'Excluida') IS NULL
+            ALTER TABLE Modalidades ADD Excluida bit NOT NULL CONSTRAINT DF_Modalidades_Excluida DEFAULT (0) WITH VALUES;
+
         -- Etapa Recepção -> Profissional (ver Data/Scripts/2026-11-11_Senhas_EtapaProfissional.sql).
         IF COL_LENGTH('Senhas', 'Etapa') IS NULL
             ALTER TABLE Senhas ADD Etapa int NOT NULL CONSTRAINT DF_Senhas_Etapa DEFAULT (1) WITH VALUES;
